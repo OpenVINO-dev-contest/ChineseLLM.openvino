@@ -2,11 +2,9 @@ import os
 from transformers import AutoTokenizer, AutoModel, AutoConfig
 import torch
 import sys
-from transformers.generation.utils import LogitsProcessorList
 now_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(now_dir)
 sys.path.append(project_dir)
-from transformers.models.bloom import BloomOnnxConfig
 
 
 from typing import List, Tuple
