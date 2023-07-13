@@ -1,0 +1,7 @@
+numpy
+openvino-dev==2023.0.0
+optimum
+git+https://github.com/huggingface/transformers.git
+git+https://github.com/huggingface/optimum-intel.git
+sentencepiece
+torch
