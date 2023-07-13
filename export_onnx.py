@@ -2,10 +2,11 @@ import os
 from transformers import AutoTokenizer, AutoModel, AutoConfig
 import torch
 import sys
-now_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(now_dir)
-sys.path.append(project_dir)
+from pathlib import Path
 
+model_path = Path('onnx_model')
+if model_path.exists()==False:
+    os.mkdir(model_path)
 
 from typing import List, Tuple
 
@@ -30,10 +31,8 @@ def build_inputs(device, tokenizer, query: str,
 
 tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True)
 model = AutoModel.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True).float()
-config = AutoConfig.from_pretrained("THUDM/chatglm2-6b") 
 
 device = 'cpu'
-# config.num_layers = 1
 model.eval()
 # input_tensors
 input_tensors = build_inputs(device, tokenizer, query, history)
@@ -138,7 +137,7 @@ with torch.no_grad():
             attention_mask, 
             past_key_values
         ),
-        f='./chatglm.onnx',
+        f='./onnx_model/chatglm.onnx',
         opset_version=14,
         input_names=input_names,
         output_names=output_names,
