@@ -13,10 +13,18 @@ This sample shows how to implement a chatglm2-based model with OpenVINO runtime.
 
     ```$mkdir onnx_model```
 
-    ```$python3 export_onnx.py -m {HuggingFace model id} -o ./onnx_model/```
+    ```$python3 export_onnx.py -m {HuggingFace model id} -o ./onnx_model/chatglm2.onnx```
 
     ***please follow the Licence on HuggingFace and get the approval before downloading llama checkpoints***
 
-3. Run restructured native OpenVINO pipeline:
+3. Convert ONNX model to OpenVINO IR:
+
+    ```$mkdir ir_model```
+
+    ```$mo -m ./onnx_model/chatglm2.onnx -o ./ir_model/ --compress_to_fp16```
+    
+    ```$rm ./onnx_model -rf```
+    
+4. Run restructured native OpenVINO pipeline:
 
     ```$python3 generate_ov.py -m  "{HuggingFace model id}" -p "请讲一个有趣的故事" ```

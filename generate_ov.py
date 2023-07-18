@@ -60,7 +60,7 @@ class ChatGLMModel():
 
     def __init__(self,
                  tokenizer_path,
-                 onnx_model_path='./onnx_model/chatglm.onnx') -> None:
+                 onnx_model_path='./ir_model/chatglm2.xml') -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
                                                        trust_remote_code=True)
         core = Core()
