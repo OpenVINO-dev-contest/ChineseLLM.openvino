@@ -27,4 +27,9 @@ This sample shows how to implement a chatglm2-based model with OpenVINO runtime.
 
 4. Run restructured native OpenVINO pipeline:
 
-    ```$python3 generate_ov.py -m  "THUDM/chatglm2-6b" -p "请讲一个有趣的故事" ```
+    ```$python3 generate_ov.py -m  "THUDM/chatglm2-6b" -p "晚上睡不着应该怎么办" ```
+
+5. Run chat mode with web UI:
+
+    ```$streamlit run chat_ov.py ```
+    

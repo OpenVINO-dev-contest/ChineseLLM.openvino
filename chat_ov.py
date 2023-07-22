@@ -4,7 +4,8 @@ from transformers import AutoTokenizer
 from openvino.runtime import Core
 import numpy as np
 import argparse
-import time
+import streamlit as st
+from streamlit_chat import message
 
 # input & output names
 past_names = [
@@ -28,6 +29,18 @@ default_past_key_values = {
 }
 
 
+def chat_template(history: list[tuple[str, str]], query: str):
+    if history == []:
+        prompt = ""
+        for i, (old_query, response) in enumerate(history):
+            prompt += "[Round {}]\n问：{}\n答：{}\n".format(
+                i + 1, old_query, response)
+        prompt += "[Round {}]\n问：{}\n答：".format(len(history) + 1, query)
+    else:
+        prompt = query
+    return prompt
+
+
 def process_response(response: str):
     response = response.strip()
     response = response.replace("[[训练时间]]", "2023年")
@@ -45,7 +58,6 @@ def process_response(response: str):
                           response)
     return response
 
-
 class ChatGLMModel():
 
     def __init__(self,
@@ -62,14 +74,10 @@ class ChatGLMModel():
         print(" --- model compiling --- ")
         # compile the model for CPU devices
         self.request = core.compile_model(
-            model=model, device_name=args.device).create_infer_request()
+            model=model, device_name='CPU').create_infer_request()
         self.eos_token_id = self.tokenizer.eos_token_id
 
-    def sample_next_token(self,
-                          logits: np.ndarray,
-                          top_k=20,
-                          top_p=0.7,
-                          temperature=1):
+    def sample_next_token(self, logits: np.ndarray, top_k, top_p, temperature):
         # softmax with temperature
         exp_logits = np.exp(logits / temperature)
         probs = exp_logits / np.sum(exp_logits)
@@ -87,19 +95,14 @@ class ChatGLMModel():
         next_token = np.random.choice(top_k_idx, size=1, p=top_k_probs)
         return next_token[0].item()
 
-    def generate_sequence(self,
-                 prompt: str,
-                 max_generated_tokens,
-                 top_k=20,
-                 top_p=0.7,
-                 temperature=1):
+    def generate_iterate(self, prompt: str, max_generated_tokens, top_k, top_p,
+                         temperature):
         inputs = self.tokenizer([prompt], return_tensors="np")
         input_ids = inputs['input_ids']
         # attention_mask = inputs['attention_mask']
         position_ids = inputs['position_ids']
         past_key_values = default_past_key_values
         output_tokens = []
-        count = 0
         while True:
             inputs = {
                 "input_ids": input_ids,
@@ -128,7 +131,6 @@ class ChatGLMModel():
                                                 temperature=temperature)
 
             output_tokens += [next_token]
-            count += 1
 
             if next_token == self.eos_token_id or len(
                     output_tokens) > max_generated_tokens:
@@ -136,45 +138,70 @@ class ChatGLMModel():
 
             input_ids = np.array([[next_token]], dtype=np.longlong)
             # attention_mask = np.concatenate([attention_mask, np.array([[0]], dtype=np.longlong)], axis=1)
-        return output_tokens, count
+
+            yield process_response(self.tokenizer.decode(output_tokens))
+        return process_response(self.tokenizer.decode(output_tokens))
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument('-h',
-                        '--help',
-                        action='help',
-                        help='Show this help message and exit.')
-    parser.add_argument('-m',
-                        '--model_id',
-                        required=True,
-                        type=str,
-                        help='Required. huggingface model id')
-    parser.add_argument('-p',
-                        '--prompt',
-                        required=True,
-                        type=str,
-                        help='Required. prompt sentence')
-    parser.add_argument('-l',
-                        '--max_sequence_length',
-                        default=128,
-                        required=False,
-                        type=int,
-                        help='Required. maximun lengh of output')
-    parser.add_argument('-d',
-                        '--device',
-                        default='CPU',
-                        required=False,
-                        type=str,
-                        help='Required. device for inference')
-    args = parser.parse_args()
-    
-    ov_chatglm = ChatGLMModel(args.model_id)
+@st.cache_resource
+def create_model():
+    return ChatGLMModel("THUDM/chatglm2-6b")
 
-    print(" --- start generating --- ")
-    start = time.perf_counter()
-    response, num_tokens = ov_chatglm.generate_sequence(args.prompt, args.max_sequence_length)
-    end = time.perf_counter()
-    answer = process_response(ov_chatglm.tokenizer.decode(response))
-    print(answer)
-    print(f"Generated {num_tokens} tokens in {end - start:.3f} s")
+
+with st.spinner("加载模型中..."):
+    ov_chatglm = create_model()
+
+if 'history' not in st.session_state:
+    st.session_state.history = []
+
+with st.sidebar:
+    st.markdown("## 选择参数")
+
+    max_tokens = st.number_input("max_tokens",
+                                 min_value=1,
+                                 max_value=500,
+                                 value=200)
+    temperature = st.number_input("temperature",
+                                  min_value=0.1,
+                                  max_value=4.0,
+                                  value=0.8)
+    top_p = st.number_input("top_p", min_value=0.1, max_value=1.0, value=0.8)
+    top_k = st.number_input("top_k", min_value=1, max_value=500, value=20)
+
+    if st.button("清空上下文"):
+        st.session_state.message = ""
+        st.session_state.history = []
+
+st.markdown("## OpenVINO Chat Robot based on ChatGLM2")
+
+history: list[tuple[str, str]] = st.session_state.history
+
+if len(history) == 0:
+    st.caption("请在下方输入消息开始会话")
+
+for idx, (question, answer) in enumerate(history):
+    message(question, is_user=True, key=f"history_question_{idx}")
+    st.write(answer)
+    st.markdown("---")
+
+next_answer = st.container()
+
+question = st.text_area(label="消息", key="message")
+
+if st.button("发送") and len(question.strip()):
+    with next_answer:
+        message(question, is_user=True, key="message_question")
+        with st.spinner("正在回复中"):
+            with st.empty():
+                prompt = chat_template(history, question)
+                for answer in ov_chatglm.generate_iterate(
+                        prompt,
+                        max_generated_tokens=max_tokens,
+                        top_k=top_k,
+                        top_p=top_p,
+                        temperature=temperature,
+                ):
+                    st.write(answer)
+        st.markdown("---")
+
+    st.session_state.history = history + [(question, answer)]
