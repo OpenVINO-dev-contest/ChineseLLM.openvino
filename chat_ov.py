@@ -29,7 +29,7 @@ default_past_key_values = {
 }
 
 
-def chat_template(history: list[tuple[str, str]], query: str):
+def build_inputs(history: list[tuple[str, str]], query: str):
     if history == []:
         prompt = ""
         for i, (old_query, response) in enumerate(history):
@@ -193,7 +193,7 @@ if st.button("发送") and len(question.strip()):
         message(question, is_user=True, key="message_question")
         with st.spinner("正在回复中"):
             with st.empty():
-                prompt = chat_template(history, question)
+                prompt = build_inputs(history, question)
                 for answer in ov_chatglm.generate_iterate(
                         prompt,
                         max_generated_tokens=max_tokens,
