@@ -27,6 +27,16 @@ default_past_key_values = {
     for k in past_names
 }
 
+def build_inputs(history: list[tuple[str, str]], query: str):
+    if history == []:
+        prompt = ""
+        for i, (old_query, response) in enumerate(history):
+            prompt += "[Round {}]\n问：{}\n答：{}\n".format(
+                i + 1, old_query, response)
+        prompt += "[Round {}]\n问：{}\n答：".format(len(history) + 1, query)
+    else:
+        prompt = query
+    return prompt
 
 def process_response(response: str):
     response = response.strip()
@@ -50,6 +60,7 @@ class ChatGLMModel():
 
     def __init__(self,
                  tokenizer_path,
+                 device='CPU',
                  model_path='./ir_model/chatglm2.xml') -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
                                                        trust_remote_code=True)
@@ -62,7 +73,7 @@ class ChatGLMModel():
         print(" --- model compiling --- ")
         # compile the model for CPU devices
         self.request = core.compile_model(
-            model=model, device_name=args.device).create_infer_request()
+            model=model, device_name=device).create_infer_request()
         self.eos_token_id = self.tokenizer.eos_token_id
 
     def sample_next_token(self,
@@ -87,19 +98,14 @@ class ChatGLMModel():
         next_token = np.random.choice(top_k_idx, size=1, p=top_k_probs)
         return next_token[0].item()
 
-    def generate_sequence(self,
-                 prompt: str,
-                 max_generated_tokens,
-                 top_k=20,
-                 top_p=0.7,
-                 temperature=1):
+    def generate_iterate(self, prompt: str, max_generated_tokens, top_k, top_p,
+                         temperature):
         inputs = self.tokenizer([prompt], return_tensors="np")
         input_ids = inputs['input_ids']
         # attention_mask = inputs['attention_mask']
         position_ids = inputs['position_ids']
         past_key_values = default_past_key_values
         output_tokens = []
-        count = 0
         while True:
             inputs = {
                 "input_ids": input_ids,
@@ -128,7 +134,6 @@ class ChatGLMModel():
                                                 temperature=temperature)
 
             output_tokens += [next_token]
-            count += 1
 
             if next_token == self.eos_token_id or len(
                     output_tokens) > max_generated_tokens:
@@ -136,7 +141,9 @@ class ChatGLMModel():
 
             input_ids = np.array([[next_token]], dtype=np.longlong)
             # attention_mask = np.concatenate([attention_mask, np.array([[0]], dtype=np.longlong)], axis=1)
-        return output_tokens, count
+
+            yield process_response(self.tokenizer.decode(output_tokens))
+        return process_response(self.tokenizer.decode(output_tokens))
 
 
 if __name__ == "__main__":
@@ -168,12 +175,13 @@ if __name__ == "__main__":
                         type=str,
                         help='Required. device for inference')
     args = parser.parse_args()
-    
-    ov_chatglm = ChatGLMModel(args.model_id)
+
+    ov_chatglm = ChatGLMModel(args.model_id, args.device)
 
     print(" --- start generating --- ")
     start = time.perf_counter()
-    response, num_tokens = ov_chatglm.generate_sequence(args.prompt, args.max_sequence_length)
+    response, num_tokens = ov_chatglm.generate_iterate(
+        args.prompt, args.max_sequence_length)
     end = time.perf_counter()
     answer = process_response(ov_chatglm.tokenizer.decode(response))
     print(answer)
