@@ -33,5 +33,5 @@ This sample shows how to implement a chatglm2-based model with OpenVINO runtime.
 
 5. Run chat mode with web UI:
 
-    ```$streamlit run chat_ov.py ```
+    ```$streamlit run chat_robot.py ```
     
