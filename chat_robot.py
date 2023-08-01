@@ -1,7 +1,6 @@
-
 import streamlit as st
 from streamlit_chat import message
-from generate_ov import ChatGLMModel, build_inputs
+from model import ChatGLMModel, build_inputs
 
 
 @st.cache_resource
@@ -16,8 +15,8 @@ if 'history' not in st.session_state:
     st.session_state.history = []
 
 with st.sidebar:
+    system = st.text_area("系统提示词", value="你是一个友好、诚实、善良的聊天助手，可以回答任何问题")
     st.markdown("## 选择参数")
-
     max_tokens = st.number_input("max_tokens",
                                  min_value=1,
                                  max_value=500,
@@ -27,13 +26,13 @@ with st.sidebar:
                                   max_value=4.0,
                                   value=0.8)
     top_p = st.number_input("top_p", min_value=0.1, max_value=1.0, value=0.8)
-    top_k = st.number_input("top_k", min_value=1, max_value=500, value=20)
+    top_k = st.number_input("top_k", min_value=1, max_value=500, value=50)
 
     if st.button("清空上下文"):
         st.session_state.message = ""
         st.session_state.history = []
 
-st.markdown("## OpenVINO Chat Robot based on ChatGLM2")
+st.markdown("## OpenVINO Chat Assitant based on ChatGLM2")
 
 history: list[tuple[str, str]] = st.session_state.history
 
@@ -54,7 +53,7 @@ if st.button("发送") and len(question.strip()):
         message(question, is_user=True, key="message_question")
         with st.spinner("正在回复中"):
             with st.empty():
-                prompt = build_inputs(history, question)
+                prompt = build_inputs(history, question, system)
                 for answer in ov_chatglm.generate_iterate(
                         prompt,
                         max_generated_tokens=max_tokens,

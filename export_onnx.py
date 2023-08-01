@@ -27,7 +27,6 @@ parser.add_argument('-o',
                     help='Required. onnx model path')
 args = parser.parse_args()
 
-
 query = "想要出国留学，应该怎么办？"
 history = [(
     "你好",
@@ -146,9 +145,8 @@ with torch.no_grad():
         model,
         args=(input_ids, position_ids, attention_mask, past_key_values),
         f=args.onnx_path,
-        opset_version=14,
+        opset_version=15,
         input_names=input_names,
         output_names=output_names,
         dynamic_axes=dynamic_axes,
-        training=torch.onnx.TrainingMode.EVAL,
     )
