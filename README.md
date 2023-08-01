@@ -1,9 +1,10 @@
 # chatglm2.openvino
 
+This sample shows how to implement a chatglm2-based model with OpenVINO runtime.
+
+
 <img width="1110" alt="image" src="https://github.com/OpenVINO-dev-contest/chatglm2.openvino/assets/91237924/6cdfbc45-f70c-42d4-b748-27113d8fe3a8">
 
-
-This sample shows how to implement a chatglm2-based model with OpenVINO runtime.
 
 **Please notice this repository is only for a functional test, and you can try to quantize the model to further optimize the performance of it**
 
