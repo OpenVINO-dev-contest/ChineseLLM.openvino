@@ -1,6 +1,6 @@
 # chatglm2.openvino
 
-<img width="833" alt="image" src="https://github.com/OpenVINO-dev-contest/chatglm2.openvino/assets/91237924/69b34a41-368e-4103-ad85-08840680d110">
+<img width="1137" alt="image" src="https://github.com/OpenVINO-dev-contest/chatglm2.openvino/assets/91237924/6cc392ae-1076-4dc3-a6f6-10d49eb553bb">
 
 This sample shows how to implement a chatglm2-based model with OpenVINO runtime.
 
