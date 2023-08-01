@@ -11,6 +11,10 @@ This sample shows how to implement a chatglm2-based model with OpenVINO runtime.
 ## How to run it?
 1. Install the requirements:
 
+    ```$python3 -m venv openvino_env```
+
+    ```$source openvino_env/bin/activate```
+
     ```$pip install -r requirements.txt```
 
 2. Export the ONNX model from HuggingFace pipeline:
