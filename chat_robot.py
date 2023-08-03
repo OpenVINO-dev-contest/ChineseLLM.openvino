@@ -32,7 +32,7 @@ with st.sidebar:
         st.session_state.message = ""
         st.session_state.history = []
 
-st.markdown("## OpenVINO Chat Assitant based on ChatGLM2")
+st.markdown("## OpenVINO Chat Assistant based on ChatGLM2")
 
 history: list[tuple[str, str]] = st.session_state.history
 
