@@ -14,10 +14,10 @@ present_names = [
 ]
 
 def build_inputs(history: list[tuple[str, str]], query: str, system: str = ""):
-    prompt = "{}\n".format(system)
+    prompt = "{}\n\n".format(system)
     for i, (old_query, response) in enumerate(history):
-        prompt += "[Round {}]\n问：{}\n答：{}\n".format(i + 1, old_query, response)
-    prompt += "[Round {}]\n问：{}\n答：".format(len(history) + 1, query)
+        prompt += "[Round {}]\n\n问：{}\n\n答：{}\n\n".format(i + 1, old_query, response)
+    prompt += "[Round {}]\n\n问：{}\n\n答：".format(len(history) + 1, query)
     print(prompt)
     return prompt
 
