@@ -46,7 +46,7 @@ class ChatGLMModel():
         self,
         tokenizer_path,
         device='CPU',
-        model_path='/home/ethan/intel/chatglm.openvino/ir_model/chatglm2.xml'
+        model_path='./ir_model/chatglm2.xml'
     ) -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
                                                        trust_remote_code=True)
