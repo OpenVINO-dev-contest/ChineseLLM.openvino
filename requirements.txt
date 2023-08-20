@@ -1,7 +1,7 @@
 numpy
 streamlit
 streamlit-chat
-openvino-dev==2023.0.0
+openvino-dev==2023.1.0.dev20230811
 optimum
 git+https://github.com/huggingface/transformers.git
 git+https://github.com/huggingface/optimum-intel.git
