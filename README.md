@@ -13,7 +13,7 @@ This sample shows how to implement a chatglm2-based model with OpenVINO runtime.
 - Linux, Windows, MacOS
 - Python >= 3.7.0
 - CPU or GPU compatible with OpenVINO.
-- RAM >= 32GB
+- RAM: CPU >= 32GB + dGPU >= 16GB or CPU ONLY >= 64GB
 
 ## How to run it?
 1. Install the requirements:
