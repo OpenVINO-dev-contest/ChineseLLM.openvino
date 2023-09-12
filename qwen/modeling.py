@@ -1,6 +1,11 @@
+import sys
 import numpy as np
 from transformers import AutoTokenizer
 from openvino.runtime import Core, Tensor
+from pathlib import Path
+utils_file_path = Path('../utils.py')
+sys.path.append(str(utils_file_path))
+from utils import process_response, sample_next_token
 
 # input & output names
 past_names = [
@@ -11,50 +16,6 @@ present_names = [
     f"present_key_values.{i}.{name}" for i in range(32)
     for name in ["key", "value"]
 ]
-
-def build_inputs(
-    tokenizer,
-    query: str,
-    history = None,
-    system: str = "",
-    max_window_size: int = 6144,
-    chat_format: str = "chatml",
-):
-    if history is None:
-        history = []
-
-    if chat_format == "chatml":
-        im_start, im_end = "<|im_start|>", "<|im_end|>"
-
-        def _to_str(role, content):
-            return f"{role}\n{content}"
-        
-        system_text = _to_str("system", system)
-
-        raw_text = ""
-
-        for turn_query, turn_response in reversed(history):
-            query_text = _to_str("user", turn_query)
-            response_text  = _to_str(
-                "assistant", turn_response
-            )
-            prev_chat = (
-                f"\n{im_start}{query_text}{im_end}\n{im_start}{response_text}{im_end}"
-            )
-
-            if len(raw_text) < max_window_size:
-                raw_text = prev_chat + raw_text
-            else:
-                break
-        raw_text = f"{im_start}{system_text}{im_end}" + raw_text
-        raw_text += f"\n{im_start}user\n{query}{im_end}\n{im_start}assistant\n"
-
-    elif chat_format == "raw":
-        raw_text = query
-    else:
-        raise NotImplementedError(f"Unknown chat format {chat_format!r}")
-
-    return raw_text
 
 class QwenModel():
 
@@ -78,28 +39,50 @@ class QwenModel():
             model=self.model, device_name=device).create_infer_request()
         self.im_end_id = self.tokenizer.im_end_id
 
-    def sample_next_token(self,
-                          logits: np.ndarray,
-                          top_k=20,
-                          top_p=0.7,
-                          temperature=1):
-        # softmax with temperature
-        exp_logits = np.exp(logits / temperature)
-        probs = exp_logits / np.sum(exp_logits)
+    def build_inputs(
+        self,
+        history: list[tuple[str, str]],
+        query: str,
+        system: str = "",
+        max_window_size: int = 6144,
+        chat_format: str = "chatml",
+        ):
+        if history is None:
+            history = []
 
-        # top k
-        top_k_idx = np.argsort(-probs)[:top_k]
-        top_k_probs = probs[top_k_idx]
+        if chat_format == "chatml":
+            im_start, im_end = "<|im_start|>", "<|im_end|>"
 
-        # top p
-        cumsum_probs = np.cumsum(top_k_probs)
-        top_k_probs[(cumsum_probs - top_k_probs) > top_p] = 0.0
-        top_k_probs = top_k_probs / np.sum(top_k_probs)
+            def _to_str(role, content):
+                return f"{role}\n{content}"
+            
+            system_text = _to_str("system", system)
 
-        # sample
-        next_token = np.random.choice(top_k_idx, size=1, p=top_k_probs)
-        return next_token[0].item()
+            raw_text = ""
 
+            for turn_query, turn_response in reversed(history):
+                query_text = _to_str("user", turn_query)
+                response_text  = _to_str(
+                    "assistant", turn_response
+                )
+                prev_chat = (
+                    f"\n{im_start}{query_text}{im_end}\n{im_start}{response_text}{im_end}"
+                )
+
+                if len(raw_text) < max_window_size:
+                    raw_text = prev_chat + raw_text
+                else:
+                    break
+            raw_text = f"{im_start}{system_text}{im_end}" + raw_text
+            raw_text += f"\n{im_start}user\n{query}{im_end}\n{im_start}assistant\n"
+
+        elif chat_format == "raw":
+            raw_text = query
+        else:
+            raise NotImplementedError(f"Unknown chat format {chat_format!r}")
+
+        return raw_text
+    
     def generate_sequence(self,
                           prompt: str,
                           max_generated_tokens=100,
@@ -138,7 +121,7 @@ class QwenModel():
                 for k, v in zip(past_names, past_key_values)
             }
 
-            next_token = self.sample_next_token(logits[0, -1],
+            next_token = sample_next_token(logits[0, -1],
                                                 top_k=top_k,
                                                 top_p=top_p,
                                                 temperature=temperature)
@@ -175,9 +158,9 @@ class QwenModel():
                     model_inputs = self.model.input(input_name)
                     shape = model_inputs.get_partial_shape()
                     if shape[0].is_dynamic:
-                        shape[0] = 0
+                        shape[0] = shape_input_ids[0]
                     if shape[1].is_dynamic:
-                        shape[1] = shape_input_ids[0]
+                        shape[1] = 0
                     inputs[input_name] = Tensor(
                         model_inputs.get_element_type(), shape.get_shape())
 
@@ -190,7 +173,7 @@ class QwenModel():
                 k: v
                 for k, v in zip(past_names, past_key_values)
             }
-            next_token = self.sample_next_token(logits[0, -1],
+            next_token = sample_next_token(logits[0, -1],
                                                 top_k=top_k,
                                                 top_p=top_p,
                                                 temperature=temperature)

@@ -1,6 +1,7 @@
 import streamlit as st
 from streamlit_chat import message
-from chatglm2.modeling import ChatGLMModel, build_inputs
+from chatglm2.modeling import ChatGLMModel
+from qwen.modeling import QwenModel
 import argparse
 
 
@@ -15,11 +16,27 @@ def create_model():
                         '--model_id',
                         required=True,
                         type=str,)
-    return ChatGLMModel("THUDM/chatglm2-6b")
+    parser.add_argument('-d',
+                    '--device',
+                    default='CPU',
+                    required=False,
+                    type=str,
+                    help='Required. device for inference')
+    args = parser.parse_args()
+    model_id = args.model_id
+    if 'chatglm' in model_id:
+        ov_model = ChatGLMModel(model_id, args.device)
+    elif 'Qwen' in model_id:
+        ov_model = QwenModel(model_id, args.device)
+    # elif 'baichuan' in model_id:
+    #     ov_model = QwenModel(model_id, args.device)
+    else:
+        raise NotImplementedError(f"Unsupported model id {model_id!r}")
+    return ov_model
 
 
 with st.spinner("加载模型中..."):
-    ov_chatglm = create_model()
+     chat_model = create_model()
 
 if 'history' not in st.session_state:
     st.session_state.history = []
@@ -63,8 +80,8 @@ if st.button("发送") and len(question.strip()):
         message(question, is_user=True, key="message_question")
         with st.spinner("正在回复中"):
             with st.empty():
-                prompt = build_inputs(history, question, system)
-                for answer in ov_chatglm.generate_iterate(
+                prompt = chat_model.build_inputs(history, question, system)
+                for answer in chat_model.generate_iterate(
                         prompt,
                         max_generated_tokens=max_tokens,
                         top_k=top_k,

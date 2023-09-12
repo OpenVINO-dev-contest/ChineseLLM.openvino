@@ -1,7 +1,12 @@
-import re
+import sys
 import numpy as np
 from transformers import AutoTokenizer
 from openvino.runtime import Core, Tensor
+from pathlib import Path
+
+utils_file_path = Path('../utils.py')
+sys.path.append(str(utils_file_path))
+from utils import process_response, sample_next_token
 
 # input & output names
 past_names = [
@@ -13,41 +18,13 @@ present_names = [
     for name in ["key", "value"]
 ]
 
-def build_inputs(history: list[tuple[str, str]], query: str, system: str = ""):
-    prompt = "{}\n\n".format(system)
-    for i, (old_query, response) in enumerate(history):
-        prompt += "[Round {}]\n\n问：{}\n\n答：{}\n\n".format(i + 1, old_query, response)
-    prompt += "[Round {}]\n\n问：{}\n\n答：".format(len(history) + 1, query)
-    print(prompt)
-    return prompt
-
-
-def process_response(response: str):
-    response = response.strip()
-    response = response.replace("[[训练时间]]", "2023年")
-    punkts = [
-        [",", "，"],
-        ["!", "！"],
-        [":", "："],
-        [";", "；"],
-        ["\?", "？"],
-    ]
-    for item in punkts:
-        response = re.sub(r"([\u4e00-\u9fff])%s" % item[0], r"\1%s" % item[1],
-                          response)
-        response = re.sub(r"%s([\u4e00-\u9fff])" % item[0], r"%s\1" % item[1],
-                          response)
-    return response
-
 
 class ChatGLMModel():
 
-    def __init__(
-        self,
-        tokenizer_path,
-        device='CPU',
-        model_path='./ir_model/chatglm2.xml'
-    ) -> None:
+    def __init__(self,
+                 tokenizer_path,
+                 device='CPU',
+                 model_path='./ir_model/chatglm2.xml') -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
                                                        trust_remote_code=True)
         core = Core()
@@ -62,27 +39,17 @@ class ChatGLMModel():
             model=self.model, device_name=device).create_infer_request()
         self.eos_token_id = self.tokenizer.eos_token_id
 
-    def sample_next_token(self,
-                          logits: np.ndarray,
-                          top_k=20,
-                          top_p=0.7,
-                          temperature=1):
-        # softmax with temperature
-        exp_logits = np.exp(logits / temperature)
-        probs = exp_logits / np.sum(exp_logits)
-
-        # top k
-        top_k_idx = np.argsort(-probs)[:top_k]
-        top_k_probs = probs[top_k_idx]
-
-        # top p
-        cumsum_probs = np.cumsum(top_k_probs)
-        top_k_probs[(cumsum_probs - top_k_probs) > top_p] = 0.0
-        top_k_probs = top_k_probs / np.sum(top_k_probs)
-
-        # sample
-        next_token = np.random.choice(top_k_idx, size=1, p=top_k_probs)
-        return next_token[0].item()
+    def build_inputs(self,
+                     history: list[tuple[str, str]],
+                     query: str,
+                     system: str = ""):
+        prompt = "{}\n\n".format(system)
+        for i, (old_query, response) in enumerate(history):
+            prompt += "[Round {}]\n\n问：{}\n\n答：{}\n\n".format(
+                i + 1, old_query, response)
+        prompt += "[Round {}]\n\n问：{}\n\n答：".format(len(history) + 1, query)
+        print(prompt)
+        return prompt
 
     def generate_sequence(self,
                           prompt: str,
@@ -127,10 +94,10 @@ class ChatGLMModel():
                 for k, v in zip(past_names, past_key_values)
             }
 
-            next_token = self.sample_next_token(logits[0, -1],
-                                                top_k=top_k,
-                                                top_p=top_p,
-                                                temperature=temperature)
+            next_token = sample_next_token(logits[0, -1],
+                                           top_k=top_k,
+                                           top_p=top_p,
+                                           temperature=temperature)
 
             output_tokens += [next_token]
 
