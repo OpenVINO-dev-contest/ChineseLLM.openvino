@@ -1,12 +1,20 @@
 import os
+import openvino as ov
+from openvino.runtime import serialize
 from transformers import AutoTokenizer, AutoModel
 import torch
 from pathlib import Path
 import argparse
 
-model_path = Path('onnx_model')
-if model_path.exists() == False:
-    os.mkdir(model_path)
+onnx_model_path = Path('onnx_model')
+ir_model_path = Path('ir_model')
+if onnx_model_path.exists() == False:
+    os.mkdir(onnx_model_path)
+if ir_model_path.exists() == False:
+    os.mkdir(ir_model_path)
+
+onnx_model = Path('onnx_model') / "chatglm2.onnx"
+ir_model = Path('ir_model') / "chatglm2.xml"
 
 from typing import List, Tuple
 
@@ -17,20 +25,22 @@ parser.add_argument('-h',
                     help='Show this help message and exit.')
 parser.add_argument('-m',
                     '--model_id',
-                    required=True,
+                    default='THUDM/chatglm2-6b',
+                    required=False,
                     type=str,
-                    help='Required. orignal model path')
-parser.add_argument('-o',
-                    '--onnx_path',
-                    required=True,
-                    type=str,
-                    help='Required. onnx model path')
+                    help='orignal model path')
+parser.add_argument('-cw',
+                    '--compress_weight',
+                    default=False,
+                    required=False,
+                    type=bool,
+                    help='Weights Compression')
 args = parser.parse_args()
 
 query = "想要出国留学，应该怎么办？"
 history = [(
     "你好",
-    "你好👋!我是人工智能助手 ChatGLM2-6B,很高兴见到你,欢迎问我任何问题。",
+    "你好👋!我是人工智能助手, 很高兴见到你,欢迎问我任何问题。",
 )]
 
 
@@ -140,13 +150,25 @@ for layer_idx in range(model.config.num_layers):
         }
     })
 
+
+if args.compress_weight == True:
+    print("--- compress weight ---")
+    from nncf import compress_weights
+    model = compress_weights(model)
+    
 with torch.no_grad():
     torch.onnx.export(
         model,
         args=(input_ids, position_ids, attention_mask, past_key_values),
-        f=args.onnx_path,
+        f="onnx_model/chatglm2.onnx",
         opset_version=15,
         input_names=input_names,
         output_names=output_names,
         dynamic_axes=dynamic_axes,
     )
+        
+if args.compress_weight == True:
+    ov_model = ov.convert_model(onnx_model)
+else:
+    ov_model = ov.convert_model(onnx_model, compress_to_fp16=True)
+serialize(ov_model, str(ir_model))
