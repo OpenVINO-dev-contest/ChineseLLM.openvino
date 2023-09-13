@@ -165,6 +165,7 @@ with torch.no_grad():
         input_names=input_names,
         output_names=output_names,
         dynamic_axes=dynamic_axes,
+        do_constant_folding=False,
     )
         
 if args.compress_weight == True:

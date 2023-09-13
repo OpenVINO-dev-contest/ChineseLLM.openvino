@@ -1,6 +1,6 @@
-from qwen.modeling import QwenModel
 from chatglm2.modeling import ChatGLMModel
 from qwen.modeling import QwenModel
+from baichuan2.modeling import BaichuanModel
 import argparse
 import time
 from utils import process_response
@@ -13,12 +13,14 @@ if __name__ == "__main__":
                         help='Show this help message and exit.')
     parser.add_argument('-m',
                         '--model_id',
-                        required=True,
+                        default="baichuan-inc/Baichuan2-7B-Chat",
+                        required=False,
                         type=str,
                         help='Required. huggingface model id')
     parser.add_argument('-p',
                         '--prompt',
-                        required=True,
+                        default="请介绍一下上海？",
+                        required=False,
                         type=str,
                         help='Required. prompt sentence')
     parser.add_argument('-l',
@@ -40,8 +42,8 @@ if __name__ == "__main__":
         ov_model = ChatGLMModel(model_id, args.device)
     elif 'Qwen' in model_id:
         ov_model = QwenModel(model_id, args.device)
-    # elif 'baichuan' in model_id:
-    #     ov_model = QwenModel(model_id, args.device)
+    elif 'Baichuan' in model_id:
+        ov_model = BaichuanModel(model_id, args.device)
     else:
         raise NotImplementedError(f"Unsupported model id {model_id!r}")
 

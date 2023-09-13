@@ -173,23 +173,23 @@ for layer_idx in range(model.config.num_hidden_layers):
     output_names += [present_key_name, present_value_name]
     dynamic_axes.update({
         past_key_name: {
-            0: "past_sequence",
-            1: "batch_size",
+            0: "batch_size",
+            1: "past_sequence",
         },
         past_value_name: {
-            0: "past_sequence",
-            1: "batch_size",
+            0: "batch_size",
+            1: "past_sequence",
         },
         present_key_name: {
-            0: "past_sequence + 1",
-            1: "batch_size"
+            0: "batch_size",
+            1: "past_sequence + 1"
         },
         present_value_name: {
-            0: "past_sequence + 1",
-            1: "batch_size"
+            0: "batch_size",
+            1: "past_sequence + 1"
         }
     })
-input_names += ["attention_mask", 'position_ids', 'token_type_ids']
+input_names += ['attention_mask', 'position_ids', 'token_type_ids']
 
 if args.compress_weight == True:
     print("--- compress weight ---")

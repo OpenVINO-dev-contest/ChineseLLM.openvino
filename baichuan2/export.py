@@ -1,6 +1,5 @@
 import os
 import openvino as ov
-from openvino.runtime import serialize
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.generation import GenerationConfig
 import torch
@@ -38,7 +37,21 @@ parser.add_argument('-cw',
                     help='Weights Compression')
 args = parser.parse_args()
 
-messages = [{"role": "user", "content": "你好"}, {"role": "system", "content": "你好👋!我是人工智能助手, 很高兴见到你,欢迎问我任何问题。"},{"role": "user", "content": "想要出国留学，应该怎么办？"}]
+query_history = [{"role": "user", "content": "你好"}, {"role": "assistant", "content": "你好👋!我是人工智能助手, 很高兴见到你,欢迎问我任何问题。"},{"role": "user", "content": "想要出国留学，应该怎么办？"}]
+
+def flattenize_inputs(inputs):
+    """
+    Helper function for making nested inputs flattens
+    """
+    flatten_inputs = []
+    for input_data in inputs:
+        if input_data is None:
+            continue
+        if isinstance(input_data, (list, tuple)):
+            flatten_inputs.extend(flattenize_inputs(input_data))
+        else:
+            flatten_inputs.append(input_data)
+    return flatten_inputs
 
 def build_inputs(device, model, tokenizer, messages: List[dict], max_new_tokens: int=0):
     def _parse_messages(messages, split_role="user"):
@@ -93,14 +106,20 @@ model.generation_config = GenerationConfig.from_pretrained(args.model_id, trust_
 
 device = 'cpu'
 # input_tensors
-input_tensors = build_inputs(device, model, tokenizer, messages)
-
+input_ids = build_inputs(device, model, tokenizer, query_history)
+attention_mask = torch.ones(input_ids.shape[0], input_ids.shape[1]).to(device)
+position_ids = torch.arange(0,input_ids.shape[1]).unsqueeze(0)
+print("input_ids shape:", input_ids.shape, "; type:", input_ids.dtype)
+print("position_ids shape:", position_ids.shape, "; type: ", input_ids.dtype)
+print("attention_mask shape:", attention_mask.shape, "; type: ",
+      attention_mask.dtype)
 print(" --- forward first --- ")
-outputs = model.forward(**input_tensors)
+outputs = model.forward(input_ids=input_ids,
+                        position_ids=position_ids,
+                         attention_mask=attention_mask
+                         )
 
 print("--- second forward ---")
-attention_mask = input_tensors["attention_mask"]
-position_ids = input_tensors["position_ids"]
 past_key_values = outputs["past_key_values"]
 # copy from forward in second time
 input_ids = torch.tensor([[30910]]).to(device)
@@ -129,7 +148,7 @@ outputs2 = model.forward(input_ids=input_ids,
                          past_key_values=past_key_values)
 print("--- export onnx ---")
 # ---prepare for onnx export ---
-input_names = ["input_ids", 'position_ids', "attention_mask"]
+input_names = ["input_ids", "attention_mask", 'position_ids']
 output_names = ["logits"]
 dynamic_axes = {
     'input_ids': {
@@ -149,7 +168,7 @@ dynamic_axes = {
         1: "sequence"
     }
 }
-for layer_idx in range(model.config.num_layers):
+for layer_idx in range(model.config.num_hidden_layers):
     # --- input key and value ---
     past_key_name = f"past_key_values.{layer_idx}.key"
     past_value_name = f"past_key_values.{layer_idx}.value"
@@ -160,42 +179,44 @@ for layer_idx in range(model.config.num_layers):
     output_names += [present_key_name, present_value_name]
     dynamic_axes.update({
         past_key_name: {
-            0: "past_sequence",
-            1: "batch_size",
+            0: "batch_size",
+            2: "past_sequence",
         },
         past_value_name: {
-            0: "past_sequence",
-            1: "batch_size",
+            0: "batch_size",
+            2: "past_sequence",
         },
         present_key_name: {
-            0: "past_sequence + 1",
-            1: "batch_size"
+            0: "batch_size",
+            2: "past_sequence + 1"
         },
         present_value_name: {
-            0: "past_sequence + 1",
-            1: "batch_size"
+            0: "batch_size",
+            2: "past_sequence + 1"
         }
     })
-
 
 if args.compress_weight == True:
     print("--- compress weight ---")
     from nncf import compress_weights
     model = compress_weights(model)
     
-with torch.no_grad():
-    torch.onnx.export(
-        model,
-        args=(input_ids, position_ids, attention_mask, past_key_values),
-        f="onnx_model/baichuan2.onnx",
-        opset_version=15,
-        input_names=input_names,
-        output_names=output_names,
-        dynamic_axes=dynamic_axes,
-    )
-        
-if args.compress_weight == True:
-    ov_model = ov.convert_model(onnx_model)
-else:
-    ov_model = ov.convert_model(onnx_model, compress_to_fp16=True)
-serialize(ov_model, str(ir_model))
+dummy_inputs = {"input_ids": input_ids, "attention_mask": attention_mask, "position_ids": position_ids, "past_key_values": past_key_values}
+model.config.torchscript = True
+ov_model = ov.convert_model(model, example_input=dummy_inputs)
+for inp_name, m_input, input_data in zip(input_names, ov_model.inputs, flattenize_inputs(dummy_inputs.values())):
+    input_node = m_input.get_node()
+    if input_node.element_type == ov.Type.dynamic:
+        m_input.get_node().set_element_type(ov.Type.f32)
+    shape = list(input_data.shape)
+    if inp_name in dynamic_axes:
+        for k in dynamic_axes[inp_name]:
+            shape[k] = -1
+    input_node.set_partial_shape(ov.PartialShape(shape))
+    m_input.get_tensor().set_names({inp_name})
+    
+for out, out_name in zip(ov_model.outputs, output_names):
+    out.get_tensor().set_names({out_name})     
+
+ov_model.validate_nodes_and_infer_types()
+ov.save_model(ov_model, ir_model)

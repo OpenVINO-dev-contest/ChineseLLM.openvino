@@ -24,7 +24,7 @@ class ChatGLMModel():
     def __init__(self,
                  tokenizer_path,
                  device='CPU',
-                 model_path='./ir_model/chatglm2.xml') -> None:
+                 model_path='./chatglm2/ir_model/chatglm2.xml') -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
                                                        trust_remote_code=True)
         core = Core()
@@ -83,7 +83,7 @@ class ChatGLMModel():
                     inputs[input_name] = Tensor(
                         model_inputs.get_element_type(), shape.get_shape())
 
-            self.request.start_async(inputs, shared_memory=True)
+            self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
             num_iteration += 1
             logits = self.request.get_tensor("logits").data
@@ -139,7 +139,7 @@ class ChatGLMModel():
                     inputs[input_name] = Tensor(
                         model_inputs.get_element_type(), shape.get_shape())
 
-            self.request.start_async(inputs, shared_memory=True)
+            self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
             logits = self.request.get_tensor("logits").data
             past_key_values = tuple(

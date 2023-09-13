@@ -110,7 +110,7 @@ class QwenModel():
                         shape[1] = 0
                     inputs[input_name] = Tensor(
                         model_inputs.get_element_type(), shape.get_shape())
-            self.request.start_async(inputs, shared_memory=True)
+            self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
             num_iteration += 1
             logits = self.request.get_tensor("logits").data
@@ -164,7 +164,7 @@ class QwenModel():
                     inputs[input_name] = Tensor(
                         model_inputs.get_element_type(), shape.get_shape())
 
-            self.request.start_async(inputs, shared_memory=True)
+            self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
             logits = self.request.get_tensor("logits").data
             past_key_values = tuple(

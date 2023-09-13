@@ -19,12 +19,12 @@ present_names = [
 ]
 
 
-class ChatGLMModel():
+class BaichuanModel():
 
     def __init__(self,
                  tokenizer_path,
                  device='CPU',
-                 model_path='./ir_model/chatglm2.xml') -> None:
+                 model_path='/home/ethan/intel/ChineseLLM.openvino/baichuan2/ir_model/baichuan2.xml') -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
                                                        trust_remote_code=True)
         core = Core()
@@ -39,18 +39,6 @@ class ChatGLMModel():
             model=self.model, device_name=device).create_infer_request()
         self.eos_token_id = self.tokenizer.eos_token_id
 
-    def build_inputs(self,
-                     history: list[tuple[str, str]],
-                     query: str,
-                     system: str = ""):
-        prompt = "{}\n\n".format(system)
-        for i, (old_query, response) in enumerate(history):
-            prompt += "[Round {}]\n\n问：{}\n\n答：{}\n\n".format(
-                i + 1, old_query, response)
-        prompt += "[Round {}]\n\n问：{}\n\n答：".format(len(history) + 1, query)
-        print(prompt)
-        return prompt
-
     def generate_sequence(self,
                           prompt: str,
                           max_generated_tokens=100,
@@ -59,7 +47,13 @@ class ChatGLMModel():
                           temperature=1):
         tokens = self.tokenizer([prompt], return_tensors="np")
         input_ids = tokens['input_ids']
-        position_ids = tokens['position_ids']
+        input_ids = np.concatenate(
+                ([[195]], input_ids, [[196]]), axis=-1)
+        print(input_ids)
+        attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]))
+        position_ids = np.arange(0, input_ids.shape[1])
+        position_ids = np.expand_dims(position_ids, 0)
+        print(position_ids)
         past_key_values = None
         num_iteration = 0
         output_tokens = []
@@ -77,12 +71,13 @@ class ChatGLMModel():
                     model_inputs = self.model.input(input_name)
                     shape = model_inputs.get_partial_shape()
                     if shape[0].is_dynamic:
-                        shape[0] = 0
-                    if shape[1].is_dynamic:
-                        shape[1] = shape_input_ids[0]
+                        shape[0] = shape_input_ids[0]
+                    if shape[2].is_dynamic:
+                        shape[2] = 0
                     inputs[input_name] = Tensor(
                         model_inputs.get_element_type(), shape.get_shape())
-
+            if attention_mask is not None:
+                inputs["attention_mask"] = attention_mask
             self.request.start_async(inputs, shared_memory=True)
             self.request.wait()
             num_iteration += 1
@@ -98,13 +93,13 @@ class ChatGLMModel():
                                            top_k=top_k,
                                            top_p=top_p,
                                            temperature=temperature)
-
             output_tokens += [next_token]
 
             if next_token == self.eos_token_id or len(
                     output_tokens) > max_generated_tokens:
                 break
-
+            attention_mask = np.concatenate(
+                (attention_mask, [[1]]), axis=-1)
             input_ids = np.array([[next_token]], dtype=np.longlong)
         return output_tokens, num_iteration
 

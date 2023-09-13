@@ -2,6 +2,7 @@ import streamlit as st
 from streamlit_chat import message
 from chatglm2.modeling import ChatGLMModel
 from qwen.modeling import QwenModel
+from baichuan2.modeling import BaichuanModel
 import argparse
 
 
@@ -28,8 +29,8 @@ def create_model():
         ov_model = ChatGLMModel(model_id, args.device)
     elif 'Qwen' in model_id:
         ov_model = QwenModel(model_id, args.device)
-    # elif 'baichuan' in model_id:
-    #     ov_model = QwenModel(model_id, args.device)
+    elif 'baichuan' in model_id:
+        ov_model = BaichuanModel(model_id, args.device)
     else:
         raise NotImplementedError(f"Unsupported model id {model_id!r}")
     return ov_model
