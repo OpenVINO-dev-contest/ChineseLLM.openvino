@@ -14,7 +14,7 @@ past_names = [
     for name in ["key", "value"]
 ]
 present_names = [
-    f"present_key_values.{i}.{name}" for i in range(32)
+    f"present.{i}.{name}" for i in range(32)
     for name in ["key", "value"]
 ]
 
@@ -25,8 +25,8 @@ class BaichuanModel():
                  tokenizer_path,
                  device='CPU',
                  model_path='/home/ethan/intel/ChineseLLM.openvino/baichuan2/ir_model/baichuan2.xml') -> None:
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
-                                                       trust_remote_code=True)
+        self.tokenizer =  AutoTokenizer.from_pretrained(tokenizer_path, use_fast=False,
+                                          trust_remote_code=True)
         core = Core()
 
         print(" --- reading model --- ")
@@ -42,30 +42,22 @@ class BaichuanModel():
     def generate_sequence(self,
                           prompt: str,
                           max_generated_tokens=100,
-                          top_k=20,
-                          top_p=0.7,
+                          top_k=50,
+                          top_p=0.85,
                           temperature=1):
         tokens = self.tokenizer([prompt], return_tensors="np")
         input_ids = tokens['input_ids']
         input_ids = np.concatenate(
                 ([[195]], input_ids, [[196]]), axis=-1)
-        print(input_ids)
-        attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]))
-        position_ids = np.arange(0, input_ids.shape[1])
-        position_ids = np.expand_dims(position_ids, 0)
-        print(position_ids)
+        attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]), dtype=np.int64)
         past_key_values = None
         num_iteration = 0
         output_tokens = []
-        new_position_id = np.copy(position_ids[..., -1:])
         while True:
             inputs = {"input_ids": input_ids}
             if past_key_values is not None:
-                new_position_id += 1
-                inputs["position_ids"] = new_position_id
                 inputs.update(past_key_values)
             else:
-                inputs["position_ids"] = position_ids
                 shape_input_ids = input_ids.shape
                 for input_name in past_names:
                     model_inputs = self.model.input(input_name)
@@ -78,7 +70,8 @@ class BaichuanModel():
                         model_inputs.get_element_type(), shape.get_shape())
             if attention_mask is not None:
                 inputs["attention_mask"] = attention_mask
-            self.request.start_async(inputs, shared_memory=True)
+            print(attention_mask)
+            self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
             num_iteration += 1
             logits = self.request.get_tensor("logits").data
@@ -88,11 +81,12 @@ class BaichuanModel():
                 k: v
                 for k, v in zip(past_names, past_key_values)
             }
-
+            print(logits[0, -1].shape)
             next_token = sample_next_token(logits[0, -1],
                                            top_k=top_k,
                                            top_p=top_p,
                                            temperature=temperature)
+            print(next_token)
             output_tokens += [next_token]
 
             if next_token == self.eos_token_id or len(

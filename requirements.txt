@@ -5,8 +5,13 @@ openvino-dev==2023.1.0.dev20230811
 optimum
 git+https://github.com/huggingface/transformers.git
 git+https://github.com/huggingface/optimum-intel.git
+nncf @ git+https://github.com/openvinotoolkit/nncf.git@release_v260
 sentencepiece
 onnx>=1.11.0
 --find-links https://download.pytorch.org/whl/torch_stable.html
 torch==1.13.1; sys_platform == 'darwin'
 torch==1.13.1+cpu; sys_platform == 'linux' or platform_system == 'Windows'
+tiktoken
+transformers_stream_generator
+einops
+bitsandbytes
