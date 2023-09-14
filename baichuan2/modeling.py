@@ -39,6 +39,58 @@ class BaichuanModel():
             model=self.model, device_name=device).create_infer_request()
         self.eos_token_id = self.tokenizer.eos_token_id
 
+    
+    def build_inputs(self,
+                     history: list[tuple[str, str]],
+                     query: str,
+                     system: str = ""):
+        def _parse_messages(messages, split_role="user"):
+            system, rounds = "", []
+            round = []
+            for i, message in enumerate(messages):
+                if message["role"] == "system":
+                    assert i == 0
+                    system = message["content"]
+                    continue
+                if message["role"] == split_role and round:
+                    rounds.append(round)
+                    round = []
+                round.append(message)
+            if round:
+                rounds.append(round)
+            return system, rounds
+
+        max_new_tokens = max_new_tokens or 2048
+        max_input_tokens = 4096 - max_new_tokens
+        system, rounds = _parse_messages(history, split_role="user")
+        system_tokens = self.tokenizer([system], return_tensors="np")
+        max_history_tokens = max_input_tokens - len(system_tokens)
+
+        history_tokens = []
+        for round in rounds[::-1]:
+            round_tokens = []
+            for message in round:
+                if message["role"] == "user":
+                    round_tokens.append(195)
+                else:
+                    round_tokens.append(196)
+                round_tokens.extend(self.tokenizer([message["content"]], return_tensors="np"))
+            if len(history_tokens) == 0 or len(history_tokens) + len(round_tokens) <= max_history_tokens:
+                history_tokens = round_tokens + history_tokens  # concat left
+                if len(history_tokens) < max_history_tokens:
+                    continue
+            break
+
+        input_tokens = system_tokens + history_tokens
+        query_token = self.tokenizer([query], return_tensors="np")
+        input_tokens.append(195)
+        input_tokens.append(query_token)
+        if history[-1]["role"] != "assistant":
+            input_tokens.append(196)
+        input_tokens.append(196)
+        input_tokens = input_tokens[-max_input_tokens:]  # truncate left
+        return input_tokens
+
     def generate_sequence(self,
                           prompt: str,
                           max_generated_tokens=100,
@@ -98,38 +150,37 @@ class BaichuanModel():
         return output_tokens, num_iteration
 
     def generate_iterate(self,
-                         prompt: str,
+                         input_tokens,
                          max_generated_tokens,
                          top_k=20,
                          top_p=0.7,
                          temperature=1):
-        tokens = self.tokenizer([prompt], return_tensors="np")
-        input_ids = tokens['input_ids']
-        position_ids = tokens['position_ids']
+        input_ids = [input_tokens]
+        attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]), dtype=np.int64)
         past_key_values = None
+        num_iteration = 0
         output_tokens = []
-        new_position_id = np.copy(position_ids[..., -1:])
         while True:
             inputs = {"input_ids": input_ids}
             if past_key_values is not None:
-                new_position_id += 1
-                inputs["position_ids"] = new_position_id
                 inputs.update(past_key_values)
             else:
-                inputs["position_ids"] = position_ids
                 shape_input_ids = input_ids.shape
                 for input_name in past_names:
                     model_inputs = self.model.input(input_name)
                     shape = model_inputs.get_partial_shape()
                     if shape[0].is_dynamic:
-                        shape[0] = 0
-                    if shape[1].is_dynamic:
-                        shape[1] = shape_input_ids[0]
+                        shape[0] = shape_input_ids[0]
+                    if shape[2].is_dynamic:
+                        shape[2] = 0
                     inputs[input_name] = Tensor(
                         model_inputs.get_element_type(), shape.get_shape())
-
-            self.request.start_async(inputs, shared_memory=True)
+            if attention_mask is not None:
+                inputs["attention_mask"] = attention_mask
+            print(attention_mask)
+            self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
+            num_iteration += 1
             logits = self.request.get_tensor("logits").data
             past_key_values = tuple(
                 self.request.get_tensor(key).data for key in present_names)
@@ -137,17 +188,19 @@ class BaichuanModel():
                 k: v
                 for k, v in zip(past_names, past_key_values)
             }
-            next_token = self.sample_next_token(logits[0, -1],
-                                                top_k=top_k,
-                                                top_p=top_p,
-                                                temperature=temperature)
-
+            print(logits[0, -1].shape)
+            next_token = sample_next_token(logits[0, -1],
+                                           top_k=top_k,
+                                           top_p=top_p,
+                                           temperature=temperature)
+            print(next_token)
             output_tokens += [next_token]
 
             if next_token == self.eos_token_id or len(
                     output_tokens) > max_generated_tokens:
                 break
-
+            attention_mask = np.concatenate(
+                (attention_mask, [[1]]), axis=-1)
             input_ids = np.array([[next_token]], dtype=np.longlong)
 
             yield process_response(self.tokenizer.decode(output_tokens))
