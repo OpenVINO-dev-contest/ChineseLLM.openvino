@@ -50,19 +50,15 @@ class BaichuanModel():
                      history: list[tuple[str, str]],
                      query: str,
                      system: str = ""):
-        input_tokens = []
         max_input_tokens = 2048
-        system_token = self.tokenizer([system], return_tensors="np")
-        input_tokens.append(system_token)
-        for i, (old_query, response) in enumerate(history):
-            old_query_token = self.tokenizer([old_query], return_tensors="np")
-            response_token = self.tokenizer([response], return_tensors="np")
-            input_tokens = input_tokens + [195] + old_query_token + [
-                196
-            ] + response_token
-        query_token = self.tokenizer([query], return_tensors="np")
-        input_tokens = input_tokens + [195] + query_token + [196]
-        input_tokens = input_tokens[-max_input_tokens:]
+        input_tokens = self.tokenizer([system], return_tensors="np")['input_ids']
+        for (old_query, response) in history:
+            old_query_token = self.tokenizer([old_query], return_tensors="np")['input_ids']
+            response_token = self.tokenizer([response], return_tensors="np")['input_ids']
+            input_tokens = np.concatenate((input_tokens, [[195]], old_query_token, [[196]], response_token), axis=-1)
+        query_token = self.tokenizer([query], return_tensors="np")['input_ids']
+        input_tokens = np.concatenate((input_tokens, [[195]], query_token, [[196]]), axis=-1)
+        input_tokens = input_tokens[:][-max_input_tokens:]
         return input_tokens
 
     def generate_sequence(self,
@@ -96,7 +92,6 @@ class BaichuanModel():
                         model_inputs.get_element_type(), shape.get_shape())
             if attention_mask is not None:
                 inputs["attention_mask"] = attention_mask
-            print(attention_mask)
             self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
             num_iteration += 1
@@ -108,12 +103,10 @@ class BaichuanModel():
                 k: v
                 for k, v in zip(self.key_value_input_names, past_key_values)
             }
-            print(logits[0, -1].shape)
             next_token = sample_next_token(logits[0, -1],
                                            top_k=top_k,
                                            top_p=top_p,
                                            temperature=temperature)
-            print(next_token)
             output_tokens += [next_token]
 
             if next_token == self.eos_token_id or len(
@@ -124,12 +117,11 @@ class BaichuanModel():
         return output_tokens, num_iteration
 
     def generate_iterate(self,
-                         input_tokens,
+                         input_ids,
                          max_generated_tokens,
                          top_k=20,
                          top_p=0.7,
                          temperature=1):
-        input_ids = [input_tokens]
         attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]),
                                  dtype=np.int64)
         past_key_values = None
@@ -152,7 +144,6 @@ class BaichuanModel():
                         model_inputs.get_element_type(), shape.get_shape())
             if attention_mask is not None:
                 inputs["attention_mask"] = attention_mask
-            print(attention_mask)
             self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
             num_iteration += 1
@@ -164,12 +155,10 @@ class BaichuanModel():
                 k: v
                 for k, v in zip(self.key_value_input_names, past_key_values)
             }
-            print(logits[0, -1].shape)
             next_token = sample_next_token(logits[0, -1],
                                            top_k=top_k,
                                            top_p=top_p,
                                            temperature=temperature)
-            print(next_token)
             output_tokens += [next_token]
 
             if next_token == self.eos_token_id or len(
