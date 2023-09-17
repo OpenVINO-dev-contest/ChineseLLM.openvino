@@ -8,87 +8,61 @@ utils_file_path = Path('../utils.py')
 sys.path.append(str(utils_file_path))
 from utils import process_response, sample_next_token
 
-# input & output names
-past_names = [
-    f"past_key_values.{i}.{name}" for i in range(32)
-    for name in ["key", "value"]
-]
-present_names = [
-    f"present.{i}.{name}" for i in range(32)
-    for name in ["key", "value"]
-]
-
 
 class BaichuanModel():
 
-    def __init__(self,
-                 tokenizer_path,
-                 device='CPU',
-                 model_path='/home/ethan/intel/ChineseLLM.openvino/baichuan2/ir_model/baichuan2.xml') -> None:
-        self.tokenizer =  AutoTokenizer.from_pretrained(tokenizer_path, use_fast=False,
-                                          trust_remote_code=True)
+    def __init__(
+        self,
+        tokenizer_path,
+        device='CPU',
+        model_path='/home/ethan/intel/ChineseLLM.openvino/baichuan2/ir_model/baichuan2.xml'
+    ) -> None:
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
+                                                       use_fast=False,
+                                                       trust_remote_code=True)
         core = Core()
 
         print(" --- reading model --- ")
         # read the model and corresponding weights from file
         self.model = core.read_model(model_path)
-
+        # input & output names
+        input_names = {
+            key.get_any_name(): idx
+            for idx, key in enumerate(self.model.inputs)
+        }
+        output_names = {
+            key.get_any_name(): idx
+            for idx, key in enumerate(self.model.outputs)
+        }
+        self.key_value_input_names = [
+            key for key in input_names if "key_values" in key
+        ]
+        self.key_value_output_names = [
+            key for key in output_names if "present" in key
+        ]
         print(" --- model compiling --- ")
         # compile the model for CPU devices
         self.request = core.compile_model(
             model=self.model, device_name=device).create_infer_request()
         self.eos_token_id = self.tokenizer.eos_token_id
 
-    
     def build_inputs(self,
                      history: list[tuple[str, str]],
                      query: str,
                      system: str = ""):
-        def _parse_messages(messages, split_role="user"):
-            system, rounds = "", []
-            round = []
-            for i, message in enumerate(messages):
-                if message["role"] == "system":
-                    assert i == 0
-                    system = message["content"]
-                    continue
-                if message["role"] == split_role and round:
-                    rounds.append(round)
-                    round = []
-                round.append(message)
-            if round:
-                rounds.append(round)
-            return system, rounds
-
-        max_new_tokens = max_new_tokens or 2048
-        max_input_tokens = 4096 - max_new_tokens
-        system, rounds = _parse_messages(history, split_role="user")
-        system_tokens = self.tokenizer([system], return_tensors="np")
-        max_history_tokens = max_input_tokens - len(system_tokens)
-
-        history_tokens = []
-        for round in rounds[::-1]:
-            round_tokens = []
-            for message in round:
-                if message["role"] == "user":
-                    round_tokens.append(195)
-                else:
-                    round_tokens.append(196)
-                round_tokens.extend(self.tokenizer([message["content"]], return_tensors="np"))
-            if len(history_tokens) == 0 or len(history_tokens) + len(round_tokens) <= max_history_tokens:
-                history_tokens = round_tokens + history_tokens  # concat left
-                if len(history_tokens) < max_history_tokens:
-                    continue
-            break
-
-        input_tokens = system_tokens + history_tokens
+        input_tokens = []
+        max_input_tokens = 2048
+        system_token = self.tokenizer([system], return_tensors="np")
+        input_tokens.append(system_token)
+        for i, (old_query, response) in enumerate(history):
+            old_query_token = self.tokenizer([old_query], return_tensors="np")
+            response_token = self.tokenizer([response], return_tensors="np")
+            input_tokens = input_tokens + [195] + old_query_token + [
+                196
+            ] + response_token
         query_token = self.tokenizer([query], return_tensors="np")
-        input_tokens.append(195)
-        input_tokens.append(query_token)
-        if history[-1]["role"] != "assistant":
-            input_tokens.append(196)
-        input_tokens.append(196)
-        input_tokens = input_tokens[-max_input_tokens:]  # truncate left
+        input_tokens = input_tokens + [195] + query_token + [196]
+        input_tokens = input_tokens[-max_input_tokens:]
         return input_tokens
 
     def generate_sequence(self,
@@ -99,9 +73,9 @@ class BaichuanModel():
                           temperature=1):
         tokens = self.tokenizer([prompt], return_tensors="np")
         input_ids = tokens['input_ids']
-        input_ids = np.concatenate(
-                ([[195]], input_ids, [[196]]), axis=-1)
-        attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]), dtype=np.int64)
+        input_ids = np.concatenate(([[195]], input_ids, [[196]]), axis=-1)
+        attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]),
+                                 dtype=np.int64)
         past_key_values = None
         num_iteration = 0
         output_tokens = []
@@ -111,7 +85,7 @@ class BaichuanModel():
                 inputs.update(past_key_values)
             else:
                 shape_input_ids = input_ids.shape
-                for input_name in past_names:
+                for input_name in self.key_value_input_names:
                     model_inputs = self.model.input(input_name)
                     shape = model_inputs.get_partial_shape()
                     if shape[0].is_dynamic:
@@ -128,10 +102,11 @@ class BaichuanModel():
             num_iteration += 1
             logits = self.request.get_tensor("logits").data
             past_key_values = tuple(
-                self.request.get_tensor(key).data for key in present_names)
+                self.request.get_tensor(key).data
+                for key in self.key_value_output_names)
             past_key_values = {
                 k: v
-                for k, v in zip(past_names, past_key_values)
+                for k, v in zip(self.key_value_input_names, past_key_values)
             }
             print(logits[0, -1].shape)
             next_token = sample_next_token(logits[0, -1],
@@ -144,8 +119,7 @@ class BaichuanModel():
             if next_token == self.eos_token_id or len(
                     output_tokens) > max_generated_tokens:
                 break
-            attention_mask = np.concatenate(
-                (attention_mask, [[1]]), axis=-1)
+            attention_mask = np.concatenate((attention_mask, [[1]]), axis=-1)
             input_ids = np.array([[next_token]], dtype=np.longlong)
         return output_tokens, num_iteration
 
@@ -156,7 +130,8 @@ class BaichuanModel():
                          top_p=0.7,
                          temperature=1):
         input_ids = [input_tokens]
-        attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]), dtype=np.int64)
+        attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]),
+                                 dtype=np.int64)
         past_key_values = None
         num_iteration = 0
         output_tokens = []
@@ -166,7 +141,7 @@ class BaichuanModel():
                 inputs.update(past_key_values)
             else:
                 shape_input_ids = input_ids.shape
-                for input_name in past_names:
+                for input_name in self.key_value_input_names:
                     model_inputs = self.model.input(input_name)
                     shape = model_inputs.get_partial_shape()
                     if shape[0].is_dynamic:
@@ -183,10 +158,11 @@ class BaichuanModel():
             num_iteration += 1
             logits = self.request.get_tensor("logits").data
             past_key_values = tuple(
-                self.request.get_tensor(key).data for key in present_names)
+                self.request.get_tensor(key).data
+                for key in self.key_value_output_names)
             past_key_values = {
                 k: v
-                for k, v in zip(past_names, past_key_values)
+                for k, v in zip(self.key_value_input_names, past_key_values)
             }
             print(logits[0, -1].shape)
             next_token = sample_next_token(logits[0, -1],
@@ -199,8 +175,7 @@ class BaichuanModel():
             if next_token == self.eos_token_id or len(
                     output_tokens) > max_generated_tokens:
                 break
-            attention_mask = np.concatenate(
-                (attention_mask, [[1]]), axis=-1)
+            attention_mask = np.concatenate((attention_mask, [[1]]), axis=-1)
             input_ids = np.array([[next_token]], dtype=np.longlong)
 
             yield process_response(self.tokenizer.decode(output_tokens))

@@ -8,16 +8,6 @@ utils_file_path = Path('../utils.py')
 sys.path.append(str(utils_file_path))
 from utils import process_response, sample_next_token
 
-# input & output names
-past_names = [
-    f"past_key_values.{i}.{name}" for i in range(28)
-    for name in ["key", "value"]
-]
-present_names = [
-    f"present_key_values.{i}.{name}" for i in range(28)
-    for name in ["key", "value"]
-]
-
 
 class ChatGLMModel():
 
@@ -32,6 +22,21 @@ class ChatGLMModel():
         print(" --- reading model --- ")
         # read the model and corresponding weights from file
         self.model = core.read_model(model_path)
+        # input & output names
+        input_names = {
+            key.get_any_name(): idx
+            for idx, key in enumerate(self.model.inputs)
+        }
+        output_names = {
+            key.get_any_name(): idx
+            for idx, key in enumerate(self.model.outputs)
+        }
+        self.key_value_input_names = [
+            key for key in input_names if "key_values" in key
+        ]
+        skey_value_output_names = [
+            key for key in output_names if "present" in key
+        ]
 
         print(" --- model compiling --- ")
         # compile the model for CPU devices
@@ -73,7 +78,7 @@ class ChatGLMModel():
             else:
                 inputs["position_ids"] = position_ids
                 shape_input_ids = input_ids.shape
-                for input_name in past_names:
+                for input_name in self.key_value_input_names:
                     model_inputs = self.model.input(input_name)
                     shape = model_inputs.get_partial_shape()
                     if shape[0].is_dynamic:
@@ -88,10 +93,11 @@ class ChatGLMModel():
             num_iteration += 1
             logits = self.request.get_tensor("logits").data
             past_key_values = tuple(
-                self.request.get_tensor(key).data for key in present_names)
+                self.request.get_tensor(key).data
+                for key in self.key_value_output_names)
             past_key_values = {
                 k: v
-                for k, v in zip(past_names, past_key_values)
+                for k, v in zip(self.key_value_input_names, past_key_values)
             }
 
             next_token = sample_next_token(logits[0, -1],
@@ -129,7 +135,7 @@ class ChatGLMModel():
             else:
                 inputs["position_ids"] = position_ids
                 shape_input_ids = input_ids.shape
-                for input_name in past_names:
+                for input_name in self.key_value_input_names:
                     model_inputs = self.model.input(input_name)
                     shape = model_inputs.get_partial_shape()
                     if shape[0].is_dynamic:
@@ -143,10 +149,11 @@ class ChatGLMModel():
             self.request.wait()
             logits = self.request.get_tensor("logits").data
             past_key_values = tuple(
-                self.request.get_tensor(key).data for key in present_names)
+                self.request.get_tensor(key).data
+                for key in self.key_value_output_names)
             past_key_values = {
                 k: v
-                for k, v in zip(past_names, past_key_values)
+                for k, v in zip(self.key_value_input_names, past_key_values)
             }
             next_token = self.sample_next_token(logits[0, -1],
                                                 top_k=top_k,

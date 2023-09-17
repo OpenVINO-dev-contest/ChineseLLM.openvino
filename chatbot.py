@@ -13,16 +13,18 @@ def create_model():
                         '--help',
                         action='help',
                         help='Show this help message and exit.')
-    parser.add_argument('-m',
-                        '--model_id',
-                        required=True,
-                        type=str,)
+    parser.add_argument(
+        '-m',
+        '--model_id',
+        required=True,
+        type=str,
+    )
     parser.add_argument('-d',
-                    '--device',
-                    default='CPU',
-                    required=False,
-                    type=str,
-                    help='Required. device for inference')
+                        '--device',
+                        default='CPU',
+                        required=False,
+                        type=str,
+                        help='Required. device for inference')
     args = parser.parse_args()
     model_id = args.model_id
     if 'chatglm' in model_id:
@@ -37,7 +39,7 @@ def create_model():
 
 
 with st.spinner("加载模型中..."):
-     chat_model = create_model()
+    chat_model = create_model()
 
 if 'history' not in st.session_state:
     st.session_state.history = []

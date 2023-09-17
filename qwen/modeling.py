@@ -3,28 +3,18 @@ import numpy as np
 from transformers import AutoTokenizer
 from openvino.runtime import Core, Tensor
 from pathlib import Path
+
 utils_file_path = Path('../utils.py')
 sys.path.append(str(utils_file_path))
 from utils import process_response, sample_next_token
 
-# input & output names
-past_names = [
-    f"past_key_values.{i}.{name}" for i in range(32)
-    for name in ["key", "value"]
-]
-present_names = [
-    f"present_key_values.{i}.{name}" for i in range(32)
-    for name in ["key", "value"]
-]
 
 class QwenModel():
 
-    def __init__(
-        self,
-        tokenizer_path,
-        device='CPU',
-        model_path='./qwen/ir_model/qwen.xml'
-    ) -> None:
+    def __init__(self,
+                 tokenizer_path,
+                 device='CPU',
+                 model_path='./qwen/ir_model/qwen.xml') -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
                                                        trust_remote_code=True)
         core = Core()
@@ -32,7 +22,21 @@ class QwenModel():
         print(" --- reading model --- ")
         # read the model and corresponding weights from file
         self.model = core.read_model(model_path)
-
+        # input & output names
+        input_names = {
+            key.get_any_name(): idx
+            for idx, key in enumerate(self.model.inputs)
+        }
+        output_names = {
+            key.get_any_name(): idx
+            for idx, key in enumerate(self.model.outputs)
+        }
+        self.key_value_input_names = [
+            key for key in input_names if "key_values" in key
+        ]
+        self.key_value_output_names = [
+            key for key in output_names if "present" in key
+        ]
         print(" --- model compiling --- ")
         # compile the model for CPU devices
         self.request = core.compile_model(
@@ -46,7 +50,7 @@ class QwenModel():
         system: str = "",
         max_window_size: int = 6144,
         chat_format: str = "chatml",
-        ):
+    ):
         if history is None:
             history = []
 
@@ -55,16 +59,14 @@ class QwenModel():
 
             def _to_str(role, content):
                 return f"{role}\n{content}"
-            
+
             system_text = _to_str("system", system)
 
             raw_text = ""
 
             for turn_query, turn_response in reversed(history):
                 query_text = _to_str("user", turn_query)
-                response_text  = _to_str(
-                    "assistant", turn_response
-                )
+                response_text = _to_str("assistant", turn_response)
                 prev_chat = (
                     f"\n{im_start}{query_text}{im_end}\n{im_start}{response_text}{im_end}"
                 )
@@ -82,7 +84,7 @@ class QwenModel():
             raise NotImplementedError(f"Unknown chat format {chat_format!r}")
 
         return raw_text
-    
+
     def generate_sequence(self,
                           prompt: str,
                           max_generated_tokens=100,
@@ -101,7 +103,7 @@ class QwenModel():
                 inputs.update(past_key_values)
             else:
                 shape_input_ids = input_ids.shape
-                for input_name in past_names:
+                for input_name in self.key_value_input_names:
                     model_inputs = self.model.input(input_name)
                     shape = model_inputs.get_partial_shape()
                     if shape[0].is_dynamic:
@@ -115,16 +117,17 @@ class QwenModel():
             num_iteration += 1
             logits = self.request.get_tensor("logits").data
             past_key_values = tuple(
-                self.request.get_tensor(key).data for key in present_names)
+                self.request.get_tensor(key).data
+                for key in self.key_value_output_names)
             past_key_values = {
                 k: v
-                for k, v in zip(past_names, past_key_values)
+                for k, v in zip(self.key_value_input_names, past_key_values)
             }
 
             next_token = sample_next_token(logits[0, -1],
-                                                top_k=top_k,
-                                                top_p=top_p,
-                                                temperature=temperature)
+                                           top_k=top_k,
+                                           top_p=top_p,
+                                           temperature=temperature)
 
             if next_token == self.im_end_id or len(
                     output_tokens) > max_generated_tokens:
@@ -154,7 +157,7 @@ class QwenModel():
             else:
                 # inputs["position_ids"] = position_ids
                 shape_input_ids = input_ids.shape
-                for input_name in past_names:
+                for input_name in self.key_value_input_names:
                     model_inputs = self.model.input(input_name)
                     shape = model_inputs.get_partial_shape()
                     if shape[0].is_dynamic:
@@ -168,15 +171,16 @@ class QwenModel():
             self.request.wait()
             logits = self.request.get_tensor("logits").data
             past_key_values = tuple(
-                self.request.get_tensor(key).data for key in present_names)
+                self.request.get_tensor(key).data
+                for key in self.key_value_output_names)
             past_key_values = {
                 k: v
-                for k, v in zip(past_names, past_key_values)
+                for k, v in zip(self.key_value_input_names, past_key_values)
             }
             next_token = sample_next_token(logits[0, -1],
-                                                top_k=top_k,
-                                                top_p=top_p,
-                                                temperature=temperature)
+                                           top_k=top_k,
+                                           top_p=top_p,
+                                           temperature=temperature)
             output_tokens += [next_token]
 
             if next_token == self.im_end_id or len(
