@@ -1,7 +1,7 @@
 numpy
 streamlit
 streamlit-chat
-openvino-dev==2023.1.0.dev20230811
+openvino-dev==2023.1.0
 optimum
 git+https://github.com/huggingface/transformers.git
 git+https://github.com/huggingface/optimum-intel.git
@@ -11,7 +11,3 @@ onnx>=1.11.0
 --find-links https://download.pytorch.org/whl/torch_stable.html
 torch==1.13.1; sys_platform == 'darwin'
 torch==1.13.1+cpu; sys_platform == 'linux' or platform_system == 'Windows'
-tiktoken
-transformers_stream_generator
-einops
-bitsandbytes

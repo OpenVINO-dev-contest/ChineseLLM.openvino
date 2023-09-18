@@ -6,15 +6,15 @@ import torch
 from pathlib import Path
 import argparse
 
-onnx_model_path = Path('onnx_model')
-ir_model_path = Path('ir_model')
+onnx_model_path = Path('chatglm2') / Path('onnx_model')
+ir_model_path = Path('chatglm2') / Path('ir_model')
 if onnx_model_path.exists() == False:
     os.mkdir(onnx_model_path)
 if ir_model_path.exists() == False:
     os.mkdir(ir_model_path)
 
-onnx_model = Path('onnx_model') / "chatglm2.onnx"
-ir_model = Path('ir_model') / "chatglm2.xml"
+onnx_model = onnx_model_path / "chatglm2.onnx"
+ir_model = ir_model_path / "chatglm2.xml"
 
 from typing import List, Tuple
 
@@ -159,7 +159,7 @@ with torch.no_grad():
     torch.onnx.export(
         model,
         args=(input_ids, position_ids, attention_mask, past_key_values),
-        f="onnx_model/chatglm2.onnx",
+        f="chatglm2/onnx_model/chatglm2.onnx",
         opset_version=15,
         input_names=input_names,
         output_names=output_names,

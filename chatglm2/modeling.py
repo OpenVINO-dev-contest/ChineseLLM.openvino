@@ -34,7 +34,7 @@ class ChatGLMModel():
         self.key_value_input_names = [
             key for key in input_names if "key_values" in key
         ]
-        skey_value_output_names = [
+        self.key_value_output_names = [
             key for key in output_names if "present" in key
         ]
 

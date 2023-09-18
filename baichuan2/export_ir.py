@@ -6,7 +6,7 @@ import torch
 from pathlib import Path
 import argparse
 
-ir_model_path = Path('ir_model')
+ir_model_path = Path('baichuan2') / Path('ir_model')
 if ir_model_path.exists() == False:
     os.mkdir(ir_model_path)
 ir_model = Path('ir_model') / "baichuan2.xml"
@@ -26,7 +26,7 @@ parser.add_argument('-m',
                     help='orignal model path')
 parser.add_argument('-cw',
                     '--compress_weight',
-                    default=True,
+                    default=False,
                     required=False,
                     type=bool,
                     help='Weights Compression')

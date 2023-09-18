@@ -15,7 +15,7 @@ class BaichuanModel():
         self,
         tokenizer_path,
         device='CPU',
-        model_path='/home/ethan/intel/ChineseLLM.openvino/baichuan2/ir_model/baichuan2.xml'
+        model_path='./baichuan2/ir_model/baichuan2.xml'
     ) -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
                                                        use_fast=False,

@@ -7,15 +7,15 @@ import torch
 from pathlib import Path
 import argparse
 
-onnx_model_path = Path('onnx_model')
-ir_model_path = Path('ir_model')
+onnx_model_path = Path('qwen') / Path('onnx_model')
+ir_model_path = Path('qwen') / Path('ir_model')
 if onnx_model_path.exists() == False:
     os.mkdir(onnx_model_path)
 if ir_model_path.exists() == False:
     os.mkdir(ir_model_path)
 
-onnx_model = Path('onnx_model') / "qwen.onnx"
-ir_model = Path('ir_model') / "qwen.xml"
+onnx_model = onnx_model_path / "qwen.onnx"
+ir_model = ir_model_path / "qwen.xml"
 
 from typing import List, Tuple
 
@@ -196,12 +196,13 @@ if args.compress_weight == True:
     from nncf import compress_weights
     model = compress_weights(model)
 
+print("--- export onnx ---")
 with torch.no_grad():
     torch.onnx.export(
         model,
         args=(input_ids, past_key_values, attention_mask, position_ids,
               token_type_ids),
-        f="onnx_model/qwen.onnx",
+        f="qwen/onnx_model/qwen.onnx",
         opset_version=15,
         input_names=input_names,
         output_names=output_names,

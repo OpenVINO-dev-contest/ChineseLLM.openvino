@@ -1,54 +1,36 @@
-# chatglm2.openvino
+# ChineseLLM.openvino
 
-This sample shows how to implement a chatglm2-based model with OpenVINO runtime.
+This sample shows how to implement trending Chinese LLM model with OpenVINO runtime.
 
 
 <img width="1110" alt="image" src="https://github.com/OpenVINO-dev-contest/chatglm2.openvino/assets/91237924/6cdfbc45-f70c-42d4-b748-27113d8fe3a8">
-
-
-**Please notice this repository is only for a functional test, and you can try to quantize the model to further optimize the performance of it**
 
 ## Requirements
 
 - Linux, Windows, MacOS
 - Python >= 3.7.0
 - CPU or GPU compatible with OpenVINO.
-- RAM: CPU >= 32GB + dGPU >= 16GB or CPU ONLY >= 64GB
+- RAM >= 32GB
+- vRAM >= 16GB
 
 ## How to run it?
-1. Install the requirements:
 
-    ```$ python3 -m venv openvino_env```
+**1. Set-up the environments:**
 
-    ```$ source openvino_env/bin/activate```
+```python3 -m venv openvino_env```
 
-    ```$ python3 -m pip install --upgrade pip```
+```source openvino_env/bin/activate```
 
-    ```$ pip install wheel setuptools```
+```python3 -m pip install --upgrade pip```
 
-    ```$ pip install -r requirements.txt```
+```pip install wheel setuptools```
 
-2. Export the ONNX model from HuggingFace pipeline:
+**2. Run tasks:**
 
-    ```$ mkdir onnx_model```
-
-    ```$ python3 export_onnx.py -m "THUDM/chatglm2-6b" -o ./onnx_model/chatglm2.onnx```
-
-    ***please follow the Licence on HuggingFace and get the approval before downloading ChatGLM2 checkpoints***
-
-3. Convert ONNX model to OpenVINO IR:
-
-    ```$ mkdir ir_model```
-
-    ```$ mo -m ./onnx_model/chatglm2.onnx -o ./ir_model/ --compress_to_fp16```
-    
-    ```$ rm ./onnx_model -rf```
-
-4. Run restructured native OpenVINO pipeline:
-
-    ```$ python3 generate_ov.py -m  "THUDM/chatglm2-6b" -p "请介绍一下上海？" ```
-
-5. Run chat mode with web UI:
-
-    ```$ streamlit run chatbot.py -- -m "baichuan-inc/Baichuan2-7B-Chat" ```
-    
+|                              |                               **ChatGLM2**                              |                                     **Baichuan2**                                    |                                 **Qwen**                                |
+|------------------------------|:-----------------------------------------------------------------------:|:------------------------------------------------------------------------------------:|:-----------------------------------------------------------------------:|
+| **Install Requirements**     | ```pip install -r chatglm2/requirements.txt```                              | ```pip install -r baichuan2/requirements.txt```                                          | ```pip install -r qwen/requirements.txt```                                  |
+| **Export FP32 IR**           | ```python3 chatglm2/export_onnx.py```                                   | ```python3 baichuan2/export_ir.py```                                                 | ```python3 qwen/export_onnx.py```                                       |
+| **Export INT8 IR(Optional)** | ```python3 chatglm2/export_onnx.py -cw=True```                          | ```python3 baichuan2/export_ir.py -cw=True```                                        | ```python3 qwen/export_onnx.py -cw=True```                              |
+| **Run text generation**      | ```python3 generate_ov.py -m 'THUDM/chatglm2-6b' -p '请介绍一下上海'``` | ```python3 generate_ov.py -m 'baichuan-inc/Baichuan2-7B-Chat' -p '请介绍一下上海'``` | ```python3 generate_ov.py -m 'Qwen/Qwen-7B-Chat' -p '请介绍一下上海'``` |
+| **Run chatbot**              | ```streamlit run chatbot.py -- -m 'THUDM/chatglm2-6b'```                | ```streamlit run chatbot.py -- -m 'baichuan-inc/Baichuan2-7B-Chat'```                | ```streamlit run chatbot.py -- -m 'Qwen/Qwen-7B-Chat'```                |
