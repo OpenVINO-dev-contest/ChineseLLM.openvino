@@ -7,7 +7,7 @@ import torch
 from pathlib import Path
 import argparse
 
-utils_file_path = Path('../utils.py')
+utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
 from utils import flattenize_inputs
 
@@ -57,8 +57,8 @@ dynamic_shapes = {"input_ids": {1: "seq_len"}}
 for idx in range(len(outs.past_key_values)):
     inputs.extend(
         [f"past_key_values.{idx}.key", f"past_key_values.{idx}.value"])
-    dynamic_shapes[inputs[-1]] = {2: "past_sequence + 1"}
-    dynamic_shapes[inputs[-2]] = {2: "past_sequence + 1"}
+    dynamic_shapes[inputs[-1]] = {1: "past_sequence + 1"}
+    dynamic_shapes[inputs[-2]] = {1: "past_sequence + 1"}
     outputs.extend([f"present.{idx}.key", f"present.{idx}.value"])
 
 dummy_inputs = {

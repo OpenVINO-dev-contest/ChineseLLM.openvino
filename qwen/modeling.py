@@ -4,7 +4,7 @@ from transformers import AutoTokenizer
 from openvino.runtime import Core, Tensor
 from pathlib import Path
 
-utils_file_path = Path('../utils.py')
+utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
 from utils import process_response, sample_next_token
 
@@ -15,7 +15,7 @@ class QwenModel():
                  tokenizer_path,
                  device='CPU',
                  model_path='./qwen/ir_model/qwen.xml') -> None:
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
+        self.tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen-7B-Chat',
                                                        trust_remote_code=True)
         core = Core()
 

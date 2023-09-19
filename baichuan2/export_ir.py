@@ -7,7 +7,7 @@ import torch
 from pathlib import Path
 import argparse
 
-utils_file_path = Path('../utils.py')
+utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
 from utils import flattenize_inputs
 
