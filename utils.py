@@ -21,6 +21,7 @@ def process_response(response: str):
 
 def sample_next_token(logits: np.ndarray, top_k=20, top_p=0.7, temperature=1):
     # softmax with temperature
+    logits = logits - np.max(logits, axis=-1, keepdims=True)
     exp_logits = np.exp(logits / temperature)
     probs = exp_logits / np.sum(exp_logits)
 
