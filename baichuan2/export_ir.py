@@ -1,7 +1,7 @@
 import os
 import sys
 import openvino as ov
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM
 from transformers.generation import GenerationConfig
 import torch
 from pathlib import Path
