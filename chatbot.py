@@ -83,9 +83,9 @@ if st.button("发送") and len(question.strip()):
         message(question, is_user=True, key="message_question")
         with st.spinner("正在回复中"):
             with st.empty():
-                prompt = chat_model.build_inputs(history, question, system)
+                prompt_token = chat_model.build_inputs(history, question, system)
                 for answer in chat_model.generate_iterate(
-                        prompt,
+                        prompt_token,
                         max_generated_tokens=max_tokens,
                         top_k=top_k,
                         top_p=top_p,

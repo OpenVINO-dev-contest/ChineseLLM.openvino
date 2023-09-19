@@ -47,23 +47,25 @@ class ChatGLMModel():
     def build_inputs(self,
                      history: list[tuple[str, str]],
                      query: str,
-                     system: str = ""):
+                     system: str = "",
+                     max_input_tokens: int = 2048):
         prompt = "{}\n\n".format(system)
         for i, (old_query, response) in enumerate(history):
             prompt += "[Round {}]\n\n问：{}\n\n答：{}\n\n".format(
                 i + 1, old_query, response)
         prompt += "[Round {}]\n\n问：{}\n\n答：".format(len(history) + 1, query)
-        return prompt
+        tokens = self.tokenizer([prompt], return_tensors="np")
+        input_tokens = tokens['input_ids'][:][-max_input_tokens:]
+        return input_tokens
 
     def generate_sequence(self,
-                          prompt: str,
+                          input_ids,
                           max_generated_tokens=100,
                           top_k=20,
                           top_p=0.7,
                           temperature=1):
-        tokens = self.tokenizer([prompt], return_tensors="np")
-        input_ids = tokens['input_ids']
-        position_ids = tokens['position_ids']
+        position_ids = np.arange(0, input_ids.shape[1], dtype=np.int64)
+        position_ids = np.expand_dims(position_ids,axis=0)
         past_key_values = None
         num_iteration = 0
         output_tokens = []
@@ -86,7 +88,6 @@ class ChatGLMModel():
                         shape[1] = shape_input_ids[0]
                     inputs[input_name] = Tensor(
                         model_inputs.get_element_type(), shape.get_shape())
-
             self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
             num_iteration += 1
@@ -103,9 +104,7 @@ class ChatGLMModel():
                                            top_k=top_k,
                                            top_p=top_p,
                                            temperature=temperature)
-
             output_tokens += [next_token]
-
             if next_token == self.eos_token_id or len(
                     output_tokens) > max_generated_tokens:
                 break
@@ -114,14 +113,13 @@ class ChatGLMModel():
         return output_tokens, num_iteration
 
     def generate_iterate(self,
-                         prompt: str,
+                         input_ids,
                          max_generated_tokens,
                          top_k=20,
                          top_p=0.7,
                          temperature=1):
-        tokens = self.tokenizer([prompt], return_tensors="np")
-        input_ids = tokens['input_ids']
-        position_ids = tokens['position_ids']
+        position_ids = np.arange(0, input_ids.shape[1], dtype=np.int64)
+        position_ids = np.expand_dims(position_ids,axis=0)
         past_key_values = None
         output_tokens = []
         new_position_id = np.copy(position_ids[..., -1:])
@@ -158,13 +156,10 @@ class ChatGLMModel():
                                                 top_k=top_k,
                                                 top_p=top_p,
                                                 temperature=temperature)
-
             output_tokens += [next_token]
-
             if next_token == self.eos_token_id or len(
                     output_tokens) > max_generated_tokens:
                 break
-
             input_ids = np.array([[next_token]], dtype=np.longlong)
 
             yield process_response(self.tokenizer.decode(output_tokens))

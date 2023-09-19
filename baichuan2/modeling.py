@@ -47,8 +47,8 @@ class BaichuanModel():
     def build_inputs(self,
                      history: list[tuple[str, str]],
                      query: str,
-                     system: str = ""):
-        max_input_tokens = 2048
+                     system: str = "",
+                     max_input_tokens: int = 2048):
         input_tokens = self.tokenizer([system],
                                       return_tensors="np")['input_ids']
         for (old_query, response) in history:
@@ -57,8 +57,7 @@ class BaichuanModel():
             response_token = self.tokenizer([response],
                                             return_tensors="np")['input_ids']
             input_tokens = np.concatenate(
-                (input_tokens, [[195]], old_query_token, [[196]
-                                                          ], response_token),
+                (input_tokens, [[195]], old_query_token, [[196]], response_token),
                 axis=-1)
         query_token = self.tokenizer([query], return_tensors="np")['input_ids']
         input_tokens = np.concatenate(
@@ -162,7 +161,6 @@ class BaichuanModel():
                                            top_p=top_p,
                                            temperature=temperature)
             output_tokens += [next_token]
-
             if next_token == self.eos_token_id or len(
                     output_tokens) > max_generated_tokens:
                 break
