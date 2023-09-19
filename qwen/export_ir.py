@@ -1,14 +1,15 @@
 import os
 import openvino as ov
-from transformers import AutoModel
+from transformers import AutoModelForCausalLM
+from transformers.generation import GenerationConfig
 import torch
 from pathlib import Path
 import argparse
 
-ir_model_path = Path('chatglm2') / Path('ir_model')
+ir_model_path = Path('qwen') / Path('ir_model')
 if ir_model_path.exists() == False:
     os.mkdir(ir_model_path)
-ir_model = ir_model_path / "chatglm2.xml"
+ir_model = ir_model_path / "qwen.xml"
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument('-h',
@@ -17,7 +18,7 @@ parser.add_argument('-h',
                     help='Show this help message and exit.')
 parser.add_argument('-m',
                     '--model_id',
-                    default='THUDM/chatglm2-6b',
+                    default='Qwen/Qwen-7B-Chat',
                     required=False,
                     type=str,
                     help='orignal model path')
@@ -44,35 +45,41 @@ def flattenize_inputs(inputs):
             flatten_inputs.append(input_data)
     return flatten_inputs
 
-model = AutoModel.from_pretrained(args.model_id,
-                                  trust_remote_code=True).float()
-model.config.use_cache = True
-device = 'cpu'
-
-outs = model(input_ids=torch.ones((1, 10), dtype=torch.long),
-             position_ids=torch.arange(0, 10, dtype=torch.long))
-inputs = ["input_ids"]
-outputs = ["logits"]
-
+model = AutoModelForCausalLM.from_pretrained(args.model_id,
+                                             device_map="auto",
+                                             trust_remote_code=True).eval()
 if args.compress_weight == True:
     print("--- compress weight ---")
     from nncf import compress_weights
     model = compress_weights(model)
 
-dynamic_shapes = {"input_ids": {1: "seq_len"}, "position_ids": {1: "seq_len"}}
-inputs.append("position_ids")
+# Specify hyperparameters for generation
+model.generation_config = GenerationConfig.from_pretrained(
+    args.model_id, trust_remote_code=True)
+model.config.use_cache = True
+
+outs = model(input_ids=torch.ones((1, 10), dtype=torch.long),
+             attention_mask=torch.ones((1, 10), dtype=torch.long))
+inputs = ["input_ids"]
+outputs = ["logits"]
+
+dynamic_shapes = {
+    "input_ids": {
+        1: "seq_len"
+    }
+}
 for idx in range(len(outs.past_key_values)):
     inputs.extend(
         [f"past_key_values.{idx}.key", f"past_key_values.{idx}.value"])
-    dynamic_shapes[inputs[-1]] = {0: "past_sequence + 1"}
-    dynamic_shapes[inputs[-2]] = {0: "past_sequence + 1"}
+    dynamic_shapes[inputs[-1]] = {2: "past_sequence + 1"}
+    dynamic_shapes[inputs[-2]] = {2: "past_sequence + 1"}
     outputs.extend([f"present.{idx}.key", f"present.{idx}.value"])
 
 dummy_inputs = {
     "input_ids": torch.ones((1, 1), dtype=torch.long),
-    "position_ids": torch.tensor([[10]], dtype=torch.long),
     "past_key_values": outs.past_key_values
 }
+
 model.config.torchscript = True
 ov_model = ov.convert_model(model, example_input=dummy_inputs)
 for inp_name, m_input, input_data in zip(

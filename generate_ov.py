@@ -45,11 +45,12 @@ if __name__ == "__main__":
         ov_model = BaichuanModel(model_id, args.device)
     else:
         raise NotImplementedError(f"Unsupported model id {model_id!r}")
-
+    
+    input_data = ov_model.build_inputs([], args.prompt)
     print(" --- start generating --- ")
     start = time.perf_counter()
     response, num_tokens = ov_model.generate_sequence(
-        prompt=args.prompt, max_generated_tokens=args.max_sequence_length)
+        input_data, max_generated_tokens=args.max_sequence_length)
     end = time.perf_counter()
     answer = process_response(
         ov_model.tokenizer.decode(response, skip_special_tokens=True))

@@ -62,14 +62,11 @@ class BaichuanModel():
         return input_tokens
 
     def generate_sequence(self,
-                          prompt: str,
+                          input_ids,
                           max_generated_tokens=100,
                           top_k=50,
                           top_p=0.85,
                           temperature=1):
-        tokens = self.tokenizer([prompt], return_tensors="np")
-        input_ids = tokens['input_ids']
-        input_ids = np.concatenate(([[195]], input_ids, [[196]]), axis=-1)
         attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]),
                                  dtype=np.int64)
         past_key_values = None

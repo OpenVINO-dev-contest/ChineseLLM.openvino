@@ -9,9 +9,7 @@ import argparse
 ir_model_path = Path('baichuan2') / Path('ir_model')
 if ir_model_path.exists() == False:
     os.mkdir(ir_model_path)
-ir_model = Path('ir_model') / "baichuan2.xml"
-
-from typing import List, Tuple
+ir_model = ir_model_path / "baichuan2.xml"
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument('-h',
@@ -46,7 +44,6 @@ def flattenize_inputs(inputs):
         else:
             flatten_inputs.append(input_data)
     return flatten_inputs
-
 
 model = AutoModelForCausalLM.from_pretrained(args.model_id,
                                              device_map="auto",

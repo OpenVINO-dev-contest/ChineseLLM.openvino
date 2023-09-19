@@ -53,7 +53,6 @@ class ChatGLMModel():
             prompt += "[Round {}]\n\n问：{}\n\n答：{}\n\n".format(
                 i + 1, old_query, response)
         prompt += "[Round {}]\n\n问：{}\n\n答：".format(len(history) + 1, query)
-        print(prompt)
         return prompt
 
     def generate_sequence(self,
