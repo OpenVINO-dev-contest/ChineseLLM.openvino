@@ -25,11 +25,12 @@ This sample shows how to implement trending Chinese LLM model with OpenVINO runt
 
 ```pip install wheel setuptools```
 
+```pip install -r requirements.txt```
+
 **2. Run tasks:**
 
 |                              |                               **ChatGLM2**                              |                                     **Baichuan2**                                    |                                 **Qwen**                                |
 |------------------------------|:-----------------------------------------------------------------------:|:------------------------------------------------------------------------------------:|:-----------------------------------------------------------------------:|
-| **Install Requirements**     | ```pip install -r chatglm2/requirements.txt```                              | ```pip install -r baichuan2/requirements.txt```                                          | ```pip install -r qwen/requirements.txt```                                  |
 | **Export FP16 IR**           | ```python3 chatglm2/export_ir.py```                                   | ```python3 baichuan2/export_ir.py```                                                 | ```python3 qwen/export_onnx.py```                                       |
 | **Export INT8 IR(Optional)** | ```python3 chatglm2/export_ir.py -cw=True```                          | ```python3 baichuan2/export_ir.py -cw=True```                                        | ```python3 qwen/export_onnx.py -cw=True```                              |
 | **Run text generation**      | ```python3 generate_ov.py -m 'THUDM/chatglm2-6b' -p '请介绍一下上海'``` | ```python3 generate_ov.py -m 'baichuan-inc/Baichuan2-7B-Chat' -p '请介绍一下上海'``` | ```python3 generate_ov.py -m 'Qwen/Qwen-7B-Chat' -p '请介绍一下上海'``` |
