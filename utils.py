@@ -1,7 +1,6 @@
 import numpy as np
 import re
 
-
 def process_response(response: str):
     response = response.strip()
     response = response.replace("[[训练时间]]", "2023年")
@@ -37,6 +36,7 @@ def sample_next_token(logits: np.ndarray, top_k=20, top_p=0.7, temperature=1):
     # sample
     next_token = np.random.choice(top_k_idx, size=1, p=top_k_probs)
     return next_token[0].item()
+
 
 def flattenize_inputs(inputs):
     """

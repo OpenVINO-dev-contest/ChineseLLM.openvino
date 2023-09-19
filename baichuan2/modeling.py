@@ -11,12 +11,10 @@ from utils import process_response, sample_next_token
 
 class BaichuanModel():
 
-    def __init__(
-        self,
-        tokenizer_path,
-        device='CPU',
-        model_path='./baichuan2/ir_model/baichuan2.xml'
-    ) -> None:
+    def __init__(self,
+                 tokenizer_path,
+                 device='CPU',
+                 model_path='./baichuan2/ir_model/baichuan2.xml') -> None:
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
                                                        use_fast=False,
                                                        trust_remote_code=True)
@@ -51,13 +49,20 @@ class BaichuanModel():
                      query: str,
                      system: str = ""):
         max_input_tokens = 2048
-        input_tokens = self.tokenizer([system], return_tensors="np")['input_ids']
+        input_tokens = self.tokenizer([system],
+                                      return_tensors="np")['input_ids']
         for (old_query, response) in history:
-            old_query_token = self.tokenizer([old_query], return_tensors="np")['input_ids']
-            response_token = self.tokenizer([response], return_tensors="np")['input_ids']
-            input_tokens = np.concatenate((input_tokens, [[195]], old_query_token, [[196]], response_token), axis=-1)
+            old_query_token = self.tokenizer([old_query],
+                                             return_tensors="np")['input_ids']
+            response_token = self.tokenizer([response],
+                                            return_tensors="np")['input_ids']
+            input_tokens = np.concatenate(
+                (input_tokens, [[195]], old_query_token, [[196]
+                                                          ], response_token),
+                axis=-1)
         query_token = self.tokenizer([query], return_tensors="np")['input_ids']
-        input_tokens = np.concatenate((input_tokens, [[195]], query_token, [[196]]), axis=-1)
+        input_tokens = np.concatenate(
+            (input_tokens, [[195]], query_token, [[196]]), axis=-1)
         input_tokens = input_tokens[:][-max_input_tokens:]
         return input_tokens
 

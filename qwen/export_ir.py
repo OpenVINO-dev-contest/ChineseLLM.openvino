@@ -6,6 +6,7 @@ from transformers.generation import GenerationConfig
 import torch
 from pathlib import Path
 import argparse
+
 utils_file_path = Path('../utils.py')
 sys.path.append(str(utils_file_path))
 from utils import flattenize_inputs
@@ -52,11 +53,7 @@ outs = model(input_ids=torch.ones((1, 10), dtype=torch.long),
 inputs = ["input_ids"]
 outputs = ["logits"]
 
-dynamic_shapes = {
-    "input_ids": {
-        1: "seq_len"
-    }
-}
+dynamic_shapes = {"input_ids": {1: "seq_len"}}
 for idx in range(len(outs.past_key_values)):
     inputs.extend(
         [f"past_key_values.{idx}.key", f"past_key_values.{idx}.value"])
