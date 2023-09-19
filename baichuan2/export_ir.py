@@ -1,10 +1,14 @@
 import os
+import sys
 import openvino as ov
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.generation import GenerationConfig
 import torch
 from pathlib import Path
 import argparse
+utils_file_path = Path('../utils.py')
+sys.path.append(str(utils_file_path))
+from utils import flattenize_inputs
 
 ir_model_path = Path('baichuan2') / Path('ir_model')
 if ir_model_path.exists() == False:
@@ -29,21 +33,6 @@ parser.add_argument('-cw',
                     type=bool,
                     help='Weights Compression')
 args = parser.parse_args()
-
-
-def flattenize_inputs(inputs):
-    """
-    Helper function for making nested inputs flattens
-    """
-    flatten_inputs = []
-    for input_data in inputs:
-        if input_data is None:
-            continue
-        if isinstance(input_data, (list, tuple)):
-            flatten_inputs.extend(flattenize_inputs(input_data))
-        else:
-            flatten_inputs.append(input_data)
-    return flatten_inputs
 
 model = AutoModelForCausalLM.from_pretrained(args.model_id,
                                              device_map="auto",
