@@ -9,7 +9,7 @@ sys.path.append(str(utils_file_path))
 from utils import process_response, sample_next_token
 
 
-class InternlmModel():
+class InternLMModel():
 
     def __init__(self,
                  tokenizer_path,
@@ -97,7 +97,6 @@ class InternlmModel():
                 k: v
                 for k, v in zip(self.key_value_input_names, past_key_values)
             }
-            # next_token = np.argmax(logits[0, -1], axis=-1)
             next_token = sample_next_token(logits[0, -1],
                                            top_k=top_k,
                                            top_p=top_p,

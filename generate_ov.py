@@ -1,6 +1,7 @@
 from chatglm2.modeling import ChatGLMModel
 from qwen.modeling import QwenModel
 from baichuan2.modeling import BaichuanModel
+from internlm.modeling import InternLMModel
 import argparse
 import time
 from utils import process_response
@@ -43,6 +44,8 @@ if __name__ == "__main__":
         ov_model = QwenModel(model_id, args.device)
     elif 'Baichuan' in model_id:
         ov_model = BaichuanModel(model_id, args.device)
+    elif 'internlm' in model_id:
+        ov_model = InternLMModel(model_id, args.device)
     else:
         raise NotImplementedError(f"Unsupported model id {model_id!r}")
     
@@ -54,5 +57,6 @@ if __name__ == "__main__":
     end = time.perf_counter()
     answer = process_response(
         ov_model.tokenizer.decode(response, skip_special_tokens=True))
+    answer = answer.split("<eoa>")[0]
     print(answer)
     print(f"Generated {num_tokens} tokens in {end - start:.3f} s")
