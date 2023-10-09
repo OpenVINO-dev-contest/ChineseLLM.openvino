@@ -12,16 +12,19 @@ from utils import process_response, sample_next_token
 class QwenModel():
 
     def __init__(self,
-                 tokenizer_path,
-                 device='CPU',
-                 model_path='./qwen/ir_model/qwen.xml') -> None:
-        self.tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen-7B-Chat',
-                                                       trust_remote_code=True)
+                 model_path='./qwen/ir_model',
+                 device='CPU') -> None:
+        
+        ir_model_path = Path(model_path)
+        ir_model = ir_model_path / "qwen.xml"
+        
+        print(" --- loading tokenizer --- ")
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         core = Core()
 
         print(" --- reading model --- ")
         # read the model and corresponding weights from file
-        self.model = core.read_model(model_path)
+        self.model = core.read_model(ir_model)
         # input & output names
         input_names = {
             key.get_any_name(): idx

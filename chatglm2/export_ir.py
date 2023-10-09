@@ -64,6 +64,8 @@ dummy_inputs = {
     "past_key_values": outs.past_key_values
 }
 model.config.torchscript = True
+
+print("====Exporting IR=====")
 ov_model = ov.convert_model(model, example_input=dummy_inputs)
 for inp_name, m_input, input_data in zip(
         inputs, ov_model.inputs, flattenize_inputs(dummy_inputs.values())):
@@ -82,3 +84,8 @@ for out, out_name in zip(ov_model.outputs, outputs):
 
 ov_model.validate_nodes_and_infer_types()
 ov.save_model(ov_model, ir_model)
+
+print("====Exporting tokenizer=====")
+from transformers import AutoTokenizer
+tokenizer = AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=True)
+tokenizer.save_pretrained(ir_model_path)

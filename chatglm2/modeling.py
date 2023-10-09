@@ -12,16 +12,19 @@ from utils import process_response, sample_next_token
 class ChatGLMModel():
 
     def __init__(self,
-                 tokenizer_path,
-                 device='CPU',
-                 model_path='./chatglm2/ir_model/chatglm2.xml') -> None:
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path,
-                                                       trust_remote_code=True)
+                 model_path='./chatglm2/ir_model',
+                 device='CPU') -> None:
+        
+        ir_model_path = Path(model_path)
+        ir_model = ir_model_path / "chatglm2.xml"
+        
+        print(" --- loading tokenizer --- ")
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         core = Core()
 
         print(" --- reading model --- ")
         # read the model and corresponding weights from file
-        self.model = core.read_model(model_path)
+        self.model = core.read_model(ir_model)
         # input & output names
         input_names = {
             key.get_any_name(): idx

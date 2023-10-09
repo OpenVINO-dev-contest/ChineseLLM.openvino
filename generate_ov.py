@@ -13,10 +13,10 @@ if __name__ == "__main__":
                         action='help',
                         help='Show this help message and exit.')
     parser.add_argument('-m',
-                        '--model_id',
+                        '--model_path',
                         required=True,
                         type=str,
-                        help='Required. huggingface model id')
+                        help='Required. model path')
     parser.add_argument('-p',
                         '--prompt',
                         default="请介绍一下上海？",
@@ -37,12 +37,12 @@ if __name__ == "__main__":
                         help='Required. device for inference')
     args = parser.parse_args()
 
-    model_id = args.model_id
-    if 'chatglm' in model_id:
+    model_id = args.model_path
+    if 'chatglm2' in model_id:
         ov_model = ChatGLMModel(model_id, args.device)
-    elif 'Qwen' in model_id:
+    elif 'qwen' in model_id:
         ov_model = QwenModel(model_id, args.device)
-    elif 'Baichuan' in model_id:
+    elif 'baichuan2' in model_id:
         ov_model = BaichuanModel(model_id, args.device)
     elif 'internlm' in model_id:
         ov_model = InternLMModel(model_id, args.device)

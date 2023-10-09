@@ -14,25 +14,25 @@ def create_model():
                         '--help',
                         action='help',
                         help='Show this help message and exit.')
-    parser.add_argument(
-        '-m',
-        '--model_id',
-        required=True,
-        type=str,
-    )
+    parser.add_argument('-m',
+                        '--model_path',
+                        required=True,
+                        type=str,
+                        help='model path')
     parser.add_argument('-d',
                         '--device',
                         default='CPU',
                         required=False,
                         type=str,
                         help='Required. device for inference')
+    
     args = parser.parse_args()
-    model_id = args.model_id
-    if 'chatglm' in model_id:
+    model_id = args.model_path
+    if 'chatglm2' in model_id:
         ov_model = ChatGLMModel(model_id, args.device)
-    elif 'Qwen' in model_id:
+    elif 'qwen' in model_id:
         ov_model = QwenModel(model_id, args.device)
-    elif 'baichuan' in model_id:
+    elif 'baichuan2' in model_id:
         ov_model = BaichuanModel(model_id, args.device)
     elif 'internlm' in model_id:
         ov_model = InternLMModel(model_id, args.device)
