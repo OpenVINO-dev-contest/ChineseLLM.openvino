@@ -83,12 +83,15 @@ class QwenModel():
         input_tokens = tokens['input_ids']
         return input_tokens
 
+
     def generate_sequence(self,
                           input_ids,
                           max_generated_tokens=100,
                           top_k=20,
-                          top_p=0.7,
+                          top_p=0.8,
                           temperature=1):
+        attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]),
+                            dtype=np.int64)
         past_key_values = None
         num_iteration = 0
         output_tokens = []
@@ -107,6 +110,9 @@ class QwenModel():
                         shape[1] = 0
                     inputs[input_name] = Tensor(
                         model_inputs.get_element_type(), shape.get_shape())
+            
+            if attention_mask is not None:
+                inputs["attention_mask"] = attention_mask
             self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
             num_iteration += 1
@@ -127,6 +133,7 @@ class QwenModel():
                     output_tokens) > max_generated_tokens:
                 break
             output_tokens += [next_token]
+            attention_mask = np.concatenate((attention_mask, [[1]]), axis=-1)
             input_ids = np.array([[next_token]], dtype=np.longlong)
         return output_tokens, num_iteration
 
