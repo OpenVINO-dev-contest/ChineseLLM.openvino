@@ -5,6 +5,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from pathlib import Path
 import argparse
+from typings import List, Tuple
 
 utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
@@ -12,7 +13,7 @@ from utils import flattenize_inputs
 
 def build_context(
     query: str,
-    history: list[tuple[str, str]],
+    history: List[Tuple[str, str]],
     system: str = "",
 ):
     im_start, im_end = "<|im_start|>", "<|im_end|>"
