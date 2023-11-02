@@ -3,6 +3,7 @@ import numpy as np
 from transformers import AutoTokenizer
 from openvino.runtime import Core, Tensor
 from pathlib import Path
+from typing import List, Tuple
 
 utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
@@ -12,11 +13,11 @@ from utils import process_response, sample_next_token
 class ChatGLMModel():
 
     def __init__(self,
-                 model_path='./chatglm2/ir_model',
+                 model_path='./chatglm/ir_model',
                  device='CPU') -> None:
         
         ir_model_path = Path(model_path)
-        ir_model = ir_model_path / "chatglm2.xml"
+        ir_model = ir_model_path / "chatglm.xml"
         
         print(" --- loading tokenizer --- ")
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
@@ -48,7 +49,7 @@ class ChatGLMModel():
         self.eos_token_id = self.tokenizer.eos_token_id
 
     def build_inputs(self,
-                     history: list[tuple[str, str]],
+                     history: List[Tuple[str, str]],
                      query: str,
                      system: str = "",
                      max_input_tokens: int = 2048):

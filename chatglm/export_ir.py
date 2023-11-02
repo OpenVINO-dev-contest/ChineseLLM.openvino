@@ -10,10 +10,10 @@ utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
 from utils import flattenize_inputs
 
-ir_model_path = Path('chatglm2') / Path('ir_model')
+ir_model_path = Path('chatglm') / Path('ir_model')
 if ir_model_path.exists() == False:
     os.mkdir(ir_model_path)
-ir_model = ir_model_path / "chatglm2.xml"
+ir_model = ir_model_path / "chatglm.xml"
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument('-h',

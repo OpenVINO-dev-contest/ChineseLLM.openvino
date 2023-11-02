@@ -3,6 +3,7 @@ import numpy as np
 from transformers import AutoTokenizer
 from openvino.runtime import Core, Tensor
 from pathlib import Path
+from typing import List, Tuple
 
 utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
@@ -48,7 +49,7 @@ class QwenModel():
 
     def build_inputs(
         self,
-        history: list[tuple[str, str]],
+        history: List[Tuple[str, str]],
         query: str,
         system: str = "",
         max_input_tokens: int = 6144,

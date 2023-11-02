@@ -47,7 +47,7 @@ history = [(
 
 def build_inputs(
     query: str,
-    history: List[Tuple[str, str]] = None,
+    history: list[Tuple[str, str]] = None,
     system: str = "",
     max_window_size: int = 6144,
     chat_format: str = "chatml",
@@ -98,7 +98,7 @@ model.generation_config = GenerationConfig.from_pretrained(
     args.model_id, trust_remote_code=True)
 device = 'cpu'
 # input_tensors
-text, tensors = build_inputs(query, history)
+text = build_inputs(query=query, history=history)
 input_tensors = tokenizer([text], return_tensors="pt")
 input_tensors = input_tensors.to(device)
 
@@ -212,5 +212,11 @@ with torch.no_grad():
 if args.compress_weight == True:
     ov_model = ov.convert_model(onnx_model)
 else:
-    ov_model = ov.convert_model(onnx_model, compress_to_fp16=True)
+    ov_model = ov.convert_model(onnx_model)
 serialize(ov_model, str(ir_model))
+
+
+print("====Exporting tokenizer=====")
+from transformers import AutoTokenizer
+tokenizer = AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=True)
+tokenizer.save_pretrained(ir_model_path)

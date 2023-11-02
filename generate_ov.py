@@ -1,4 +1,4 @@
-from chatglm2.modeling import ChatGLMModel
+from chatglm.modeling import ChatGLMModel
 from qwen.modeling import QwenModel
 from baichuan2.modeling import BaichuanModel
 from internlm.modeling import InternLMModel
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     model_id = args.model_path
-    if 'chatglm2' in model_id:
+    if 'chatglm' in model_id:
         ov_model = ChatGLMModel(model_id, args.device)
     elif 'qwen' in model_id:
         ov_model = QwenModel(model_id, args.device)

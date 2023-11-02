@@ -7,7 +7,7 @@ This sample shows how to implement trending Chinese LLM model with OpenVINO runt
 
 ## Supported models
 
-- ChatGLM2
+- ChatGLM2/3
 - Baichuan2
 - Qwen
 - InternLM
@@ -38,9 +38,9 @@ pip install -r requirements.txt
 
 **2. Run tasks:**
 
-|                              |                               **ChatGLM2**                              |                                     **Baichuan2**                                    |                                 **Qwen**                                |                                   **InternLM**                                  |
+|                              |                               **ChatGLM2/3**                              |                                     **Baichuan2**                                    |                                 **Qwen**                                |                                   **InternLM**                                  |
 |------------------------------|:-----------------------------------------------------------------------:|:------------------------------------------------------------------------------------:|:-----------------------------------------------------------------------:|:-------------------------------------------------------------------------------:|
-| **Export FP16 IR**           | ```python3 chatglm2/export_ir.py```                                     | ```python3 baichuan2/export_ir.py```                                                 | ```python3 qwen/export_ir.py```                                         | ```python3 internlm/export_ir.py```                                             |
-| **Export INT8 IR(Optional)** | ```python3 chatglm2/export_ir.py -cw=True```                            | ```python3 baichuan2/export_ir.py -cw=True```                                        | ```python3 qwen/export_ir.py -cw=True```                                | ```python3 Internlm/export_ir.py -cw=True```                                    |
-| **Run text generation**      | ```python3 generate_ov.py -m 'chatglm2/ir_model' -p '请介绍一下上海'``` | ```python3 generate_ov.py -m 'baichuan2/ir_model' -p '请介绍一下上海'``` | ```python3 generate_ov.py -m 'qwen/ir_model' -p '请介绍一下上海'``` | ```python3 generate_ov.py -m 'internlm/ir_model' -p '请介绍一下上海'``` |
-| **Run chatbot**              | ```streamlit run chatbot.py -- -m 'chatglm2/ir_model'```                | ```streamlit run chatbot.py -- -m 'baichuan2/ir_model'```                | ```streamlit run chatbot.py -- -m 'qwen/ir_model'```                | ```streamlit run chatbot.py -- -m 'internlm/ir_model'```                |
+| **Export FP16 IR**           | ```python3 chatglm/export_ir.py```                                     | ```python3 baichuan2/export_ir.py```                                                 | ```python3 qwen/export_ir.py```                                         | ```python3 internlm/export_ir.py```                                             |
+| **Export INT8 IR(Optional)** | ```python3 chatglm/export_ir.py -cw=True```                            | ```python3 baichuan2/export_ir.py -cw=True```                                        | ```python3 qwen/export_ir.py -cw=True```                                | ```python3 Internlm/export_ir.py -cw=True```                                    |
+| **Run text generation**      | ```python3 generate_ov.py -m 'chatglm/ir_model' -p '请介绍一下上海'``` | ```python3 generate_ov.py -m 'baichuan2/ir_model' -p '请介绍一下上海'``` | ```python3 generate_ov.py -m 'qwen/ir_model' -p '请介绍一下上海'``` | ```python3 generate_ov.py -m 'internlm/ir_model' -p '请介绍一下上海'``` |
+| **Run chatbot**              | ```streamlit run chatbot.py -- -m 'chatglm/ir_model'```                | ```streamlit run chatbot.py -- -m 'baichuan2/ir_model'```                | ```streamlit run chatbot.py -- -m 'qwen/ir_model'```                | ```streamlit run chatbot.py -- -m 'internlm/ir_model'```                |
