@@ -9,18 +9,18 @@ utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
 from utils import process_response, sample_next_token
 
-
 class InternLMModel():
 
     def __init__(self,
-                 model_path='./internlm/ir_model',
+                 model_path='./internlm/internlm',
                  device='CPU') -> None:
-        
+
         ir_model_path = Path(model_path)
-        ir_model = ir_model_path / "internlm.xml"
-        
+        ir_model = ir_model_path / "openvino_model.xml"
+
         print(" --- loading tokenizer --- ")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_path, trust_remote_code=True)
         core = Core()
 
         print(" --- reading model --- ")
@@ -61,6 +61,13 @@ class InternLMModel():
         tokens = self.tokenizer([prompt], return_tensors="np")
         input_tokens = tokens['input_ids'][:][-max_input_tokens:]
         return input_tokens
+
+    def process_response(self, output, history):
+        output = output.split("<eoa>")[0]
+        return output, [history, output]
+
+    def build_memory(self, memory, query):
+        return memory[0] + [(query, memory[1])]
 
     def generate_sequence(self,
                           input_ids,
@@ -116,6 +123,7 @@ class InternLMModel():
 
     def generate_iterate(self,
                          input_ids,
+                         history,
                          max_generated_tokens,
                          top_k=20,
                          top_p=0.7,
@@ -123,7 +131,6 @@ class InternLMModel():
         attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]),
                                  dtype=np.int64)
         past_key_values = None
-        num_iteration = 0
         output_tokens = []
         while True:
             inputs = {"input_ids": input_ids}
@@ -144,7 +151,6 @@ class InternLMModel():
                 inputs["attention_mask"] = attention_mask
             self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
-            num_iteration += 1
             logits = self.request.get_tensor("logits").data
             past_key_values = tuple(
                 self.request.get_tensor(key).data
@@ -164,5 +170,5 @@ class InternLMModel():
             attention_mask = np.concatenate((attention_mask, [[1]]), axis=-1)
             input_ids = np.array([[next_token]], dtype=np.longlong)
 
-            yield process_response(self.tokenizer.decode(output_tokens)).split("<eoa>")[0]
-        return process_response(self.tokenizer.decode(output_tokens)).split("<eoa>")[0]
+            yield self.process_response(self.tokenizer.decode(output_tokens, skip_special_tokens=True), history)
+        return self.process_response(self.tokenizer.decode(output_tokens, skip_special_tokens=True), history)

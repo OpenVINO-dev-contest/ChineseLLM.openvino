@@ -3,23 +3,24 @@ import numpy as np
 from transformers import AutoTokenizer
 from openvino.runtime import Core, Tensor
 from pathlib import Path
+from typing import List, Tuple
 
 utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
-from utils import process_response, sample_next_token
+from utils import sample_next_token
 
-
-class BaichuanModel():
+class Baichuan2Model():
 
     def __init__(self,
-                 model_path='./baichuan2/ir_model',
+                 model_path='./baichuan/baichuan2',
                  device='CPU') -> None:
-        
+
         ir_model_path = Path(model_path)
-        ir_model = ir_model_path / "baichuan2.xml"
-        
+        ir_model = ir_model_path / "openvino_model.xml"
+
         print(" --- loading tokenizer --- ")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_path, trust_remote_code=True)
         core = Core()
 
         print(" --- reading model --- ")
@@ -47,7 +48,7 @@ class BaichuanModel():
         self.eos_token_id = self.tokenizer.eos_token_id
 
     def build_inputs(self,
-                     history: list[tuple[str, str]],
+                     history: List[Tuple[str, str]],
                      query: str,
                      system: str = "",
                      max_input_tokens: int = 2048):
@@ -59,13 +60,20 @@ class BaichuanModel():
             response_token = self.tokenizer([response],
                                             return_tensors="np")['input_ids']
             input_tokens = np.concatenate(
-                (input_tokens, [[195]], old_query_token, [[196]], response_token),
+                (input_tokens, [[195]], old_query_token,
+                 [[196]], response_token),
                 axis=-1)
         query_token = self.tokenizer([query], return_tensors="np")['input_ids']
         input_tokens = np.concatenate(
             (input_tokens, [[195]], query_token, [[196]]), axis=-1)
         input_tokens = input_tokens[:][-max_input_tokens:]
         return input_tokens
+
+    def process_response(self, output, history):
+        return output, [history, output]
+
+    def build_memory(self, memory, query):
+        return memory[0] + [(query, memory[1])]
 
     def generate_sequence(self,
                           input_ids,
@@ -121,6 +129,7 @@ class BaichuanModel():
 
     def generate_iterate(self,
                          input_ids,
+                         history,
                          max_generated_tokens,
                          top_k=20,
                          top_p=0.7,
@@ -128,7 +137,6 @@ class BaichuanModel():
         attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]),
                                  dtype=np.int64)
         past_key_values = None
-        num_iteration = 0
         output_tokens = []
         while True:
             inputs = {"input_ids": input_ids}
@@ -149,7 +157,6 @@ class BaichuanModel():
                 inputs["attention_mask"] = attention_mask
             self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
-            num_iteration += 1
             logits = self.request.get_tensor("logits").data
             past_key_values = tuple(
                 self.request.get_tensor(key).data
@@ -169,5 +176,5 @@ class BaichuanModel():
             attention_mask = np.concatenate((attention_mask, [[1]]), axis=-1)
             input_ids = np.array([[next_token]], dtype=np.longlong)
 
-            yield process_response(self.tokenizer.decode(output_tokens))
-        return process_response(self.tokenizer.decode(output_tokens))
+            yield self.process_response(self.tokenizer.decode(output_tokens), history)
+        return self.process_response(self.tokenizer.decode(output_tokens), history)

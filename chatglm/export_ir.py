@@ -10,11 +10,6 @@ utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
 from utils import flattenize_inputs
 
-ir_model_path = Path('chatglm') / Path('ir_model')
-if ir_model_path.exists() == False:
-    os.mkdir(ir_model_path)
-ir_model = ir_model_path / "chatglm.xml"
-
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument('-h',
                     '--help',
@@ -22,7 +17,7 @@ parser.add_argument('-h',
                     help='Show this help message and exit.')
 parser.add_argument('-m',
                     '--model_id',
-                    default='THUDM/chatglm2-6b',
+                    default='THUDM/chatglm3-6b',
                     required=False,
                     type=str,
                     help='orignal model path')
@@ -34,6 +29,18 @@ parser.add_argument('-cw',
                     help='Weights Compression')
 args = parser.parse_args()
 
+if 'chatglm2' in args.model_id:
+    ir_model_path = Path('chatglm') / Path('chatglm2')
+    if ir_model_path.exists() == False:
+        os.mkdir(ir_model_path)
+elif 'chatglm3' in args.model_id:
+    ir_model_path = Path('chatglm') / Path('chatglm3')
+    if ir_model_path.exists() == False:
+        os.mkdir(ir_model_path)
+else:
+    raise NotImplementedError(f"Unsupported model id {args.model_id!r}")
+
+ir_model = ir_model_path / "openvino_model.xml"
 model = AutoModel.from_pretrained(args.model_id,
                                   trust_remote_code=True).float()
 model.config.use_cache = True

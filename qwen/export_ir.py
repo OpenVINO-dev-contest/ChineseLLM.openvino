@@ -1,43 +1,20 @@
 import os
 import sys
 import openvino as ov
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM
+from transformers.generation import GenerationConfig
 import torch
 from pathlib import Path
 import argparse
-from typing import List, Tuple
 
 utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
 from utils import flattenize_inputs
 
-def build_context(
-    query: str,
-    history: List[Tuple[str, str]],
-    system: str = "",
-):
-    im_start, im_end = "<|im_start|>", "<|im_end|>"
-    
-    def _to_str(role, content):
-        return f"{role}\n{content}"
-
-    system_text = _to_str("system", system)
-    raw_text = ""
-    for turn_query, turn_response in reversed(history):
-        query_text = _to_str("user", turn_query)
-        response_text = _to_str("assistant", turn_response)
-        prev_chat = (
-            f"\n{im_start}{query_text}{im_end}\n{im_start}{response_text}{im_end}"
-        )
-        raw_text = prev_chat + raw_text
-    raw_text = f"{im_start}{system_text}{im_end}" + raw_text
-    raw_text += f"\n{im_start}user\n{query}{im_end}\n{im_start}assistant\n"
-    return raw_text
-
-ir_model_path = Path('qwen') / Path('ir_model')
+ir_model_path = Path('qwen') / Path('qwen')
 if ir_model_path.exists() == False:
     os.mkdir(ir_model_path)
-ir_model = ir_model_path / "qwen.xml"
+ir_model = ir_model_path / "openvino_model.xml"
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument('-h',
@@ -62,25 +39,18 @@ model = AutoModelForCausalLM.from_pretrained(args.model_id,
                                              device_map="auto",
                                              trust_remote_code=True).eval()
 
-tokenizer = AutoTokenizer.from_pretrained(args.model_id,
-                                          trust_remote_code=True)
 if args.compress_weight == True:
     print("--- compress weight ---")
     from nncf import compress_weights
     model = compress_weights(model)
 
+# Specify hyperparameters for generation
+model.generation_config = GenerationConfig.from_pretrained(
+    args.model_id, trust_remote_code=True)
 model.config.use_cache = True
-query = "想要出国留学，应该怎么办？"
-history = [(
-    "你好",
-    "你好👋!我是人工智能助手，很高兴见到你,欢迎问我任何问题。",
-)]
-text = build_context(query=query, history=history)
-input_tensors = tokenizer([text], return_tensors="pt")
-input_tensors = input_tensors.to('cpu')
 
-outs = model.forward(**input_tensors)
-
+outs = model(input_ids=torch.ones((1, 2048), dtype=torch.long),
+             attention_mask=torch.ones((1, 2048), dtype=torch.long))
 inputs = ["input_ids"]
 outputs = ["logits"]
 
@@ -98,15 +68,12 @@ for idx in range(len(outs.past_key_values)):
     dynamic_shapes[inputs[-1]] = {1: "past_sequence + 1"}
     dynamic_shapes[inputs[-2]] = {1: "past_sequence + 1"}
     outputs.extend([f"present.{idx}.key", f"present.{idx}.value"])
-
 inputs.append("attention_mask")
-
 dummy_inputs = {
-    "input_ids": torch.tensor([[30910]]),
+    "input_ids": torch.ones((1, 2), dtype=torch.long),
     "past_key_values": outs.past_key_values,
-    "attention_mask": torch.ones((1, 47), dtype=torch.long),
+    "attention_mask": torch.ones((1, 2050), dtype=torch.long)
 }
-
 model.config.torchscript = True
 
 print("====Exporting IR=====")
@@ -130,4 +97,6 @@ ov_model.validate_nodes_and_infer_types()
 ov.save_model(ov_model, ir_model)
 
 print("====Exporting tokenizer=====")
+from transformers import AutoTokenizer
+tokenizer = AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=True)
 tokenizer.save_pretrained(ir_model_path)

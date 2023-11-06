@@ -8,14 +8,14 @@ from pathlib import Path
 import argparse
 
 onnx_model_path = Path('qwen') / Path('onnx_model')
-ir_model_path = Path('qwen') / Path('ir_model')
+ir_model_path = Path('qwen') / Path('qwen')
 if onnx_model_path.exists() == False:
     os.mkdir(onnx_model_path)
 if ir_model_path.exists() == False:
     os.mkdir(ir_model_path)
 
 onnx_model = onnx_model_path / "qwen.onnx"
-ir_model = ir_model_path / "qwen.xml"
+ir_model = ir_model_path / "openvino_model.xml"
 
 from typing import List, Tuple
 

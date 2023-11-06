@@ -4,20 +4,21 @@ from transformers import AutoTokenizer
 from openvino.runtime import Core, Tensor
 from pathlib import Path
 from typing import List, Tuple
+from copy import deepcopy
 
 utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
-from utils import process_response, sample_next_token
+from utils import sample_next_token
 
 
-class ChatGLMModel():
+class ChatGLM2Model():
 
     def __init__(self,
-                 model_path='./chatglm/ir_model',
+                 model_path='./chatglm/chatglm2',
                  device='CPU') -> None:
         
         ir_model_path = Path(model_path)
-        ir_model = ir_model_path / "chatglm.xml"
+        ir_model = ir_model_path / "openvino_model.xml"
         
         print(" --- loading tokenizer --- ")
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
@@ -46,13 +47,13 @@ class ChatGLMModel():
         # compile the model for CPU devices
         self.request = core.compile_model(
             model=self.model, device_name=device).create_infer_request()
-        self.eos_token_id = self.tokenizer.eos_token_id
+        self.eos_token_id = [self.tokenizer.eos_token_id]
 
     def build_inputs(self,
-                     history: List[Tuple[str, str]],
-                     query: str,
-                     system: str = "",
-                     max_input_tokens: int = 2048):
+                        history: List[Tuple[str, str]],
+                        query: str,
+                        system: str = "",
+                        max_input_tokens: int = 2048):
         prompt = "{}\n\n".format(system)
         for i, (old_query, response) in enumerate(history):
             prompt += "[Round {}]\n\n问：{}\n\n答：{}\n\n".format(
@@ -61,13 +62,21 @@ class ChatGLMModel():
         tokens = self.tokenizer([prompt], return_tensors="np")
         input_tokens = tokens['input_ids'][:][-max_input_tokens:]
         return input_tokens
+    
+    def process_response(self, output, history):
+        output = output.strip()
+        output = output.replace("[[训练时间]]", "2023年")
+        return output, [history, output]
 
+    def build_memory(self, memory, query):
+        return memory[0] + [(query, memory[1])]
+    
     def generate_sequence(self,
-                          input_ids,
-                          max_generated_tokens=100,
-                          top_k=20,
-                          top_p=0.7,
-                          temperature=1):
+                    input_ids,
+                    max_generated_tokens=100,
+                    top_k=20,
+                    top_p=0.7,
+                    temperature=1):
         position_ids = np.arange(0, input_ids.shape[1], dtype=np.int64)
         position_ids = np.expand_dims(position_ids,axis=0)
         past_key_values = None
@@ -109,7 +118,7 @@ class ChatGLMModel():
                                            top_p=top_p,
                                            temperature=temperature)
             output_tokens += [next_token]
-            if next_token == self.eos_token_id or len(
+            if next_token in self.eos_token_id or len(
                     output_tokens) > max_generated_tokens:
                 break
 
@@ -118,6 +127,7 @@ class ChatGLMModel():
 
     def generate_iterate(self,
                          input_ids,
+                         history,
                          max_generated_tokens,
                          top_k=20,
                          top_p=0.7,
@@ -161,10 +171,42 @@ class ChatGLMModel():
                                                 top_p=top_p,
                                                 temperature=temperature)
             output_tokens += [next_token]
-            if next_token == self.eos_token_id or len(
+            if next_token in self.eos_token_id or len(
                     output_tokens) > max_generated_tokens:
                 break
             input_ids = np.array([[next_token]], dtype=np.longlong)
+            yield self.process_response(self.tokenizer.decode(output_tokens, skip_special_tokens=True), history)
+        return self.process_response(self.tokenizer.decode(output_tokens, skip_special_tokens=True), history)
 
-            yield process_response(self.tokenizer.decode(output_tokens))
-        return process_response(self.tokenizer.decode(output_tokens))
+
+class ChatGLM3Model(ChatGLM2Model):
+    
+    def __init__(self,
+                model_path='./chatglm/chatglm3_model',
+                device='CPU') -> None:
+        ChatGLM2Model.__init__(self, model_path, device)
+        self.eos_token_id = [self.tokenizer.eos_token_id, self.tokenizer.get_command("<|user|>"),
+                        self.tokenizer.get_command("<|observation|>")]
+        
+    def build_inputs(self,
+                history: List[Tuple[str, str]],
+                query: str,
+                system: str = "",
+                max_input_tokens: int = 2048):
+        inputs = self.tokenizer.build_chat_input(query, history=history, role="user")
+        input_tokens = inputs['input_ids'].numpy()
+        input_tokens = input_tokens[:][-max_input_tokens:]
+        return input_tokens
+    
+    def process_response(self, output, history):
+        content = ""
+        history = deepcopy(history)
+        for response in output.split("<|assistant|>"):
+            content = response.strip()
+            history.append({"role": "assistant", "metadata": '', "content": content})
+            content = content.replace("[[训练时间]]", "2023年")
+        return content, history
+    
+    def build_memory(self, memory, query):
+        memory.append({"role": "user", "content": query})
+        return memory

@@ -1,26 +1,27 @@
-import sys
-import numpy as np
-from transformers import AutoTokenizer
-from openvino.runtime import Core, Tensor
-from pathlib import Path
 from typing import List, Tuple
+from pathlib import Path
+from openvino.runtime import Core, Tensor
+from transformers import AutoTokenizer
+import numpy as np
+import sys
 
 utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
-from utils import process_response, sample_next_token
+from utils import sample_next_token
 
 
 class QwenModel():
 
     def __init__(self,
-                 model_path='./qwen/ir_model',
+                 model_path='./qwen/qwen',
                  device='CPU') -> None:
-        
+
         ir_model_path = Path(model_path)
-        ir_model = ir_model_path / "qwen.xml"
-        
+        ir_model = ir_model_path / "openvino_model.xml"
+
         print(" --- loading tokenizer --- ")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_path, trust_remote_code=True)
         core = Core()
 
         print(" --- reading model --- ")
@@ -45,7 +46,8 @@ class QwenModel():
         # compile the model for CPU devices
         self.request = core.compile_model(
             model=self.model, device_name=device).create_infer_request()
-        self.im_end_id = self.tokenizer.im_end_id
+        self.stop_words = [self.tokenizer.im_end_id,
+                           self.tokenizer.im_start_id]
 
     def build_inputs(
         self,
@@ -59,7 +61,7 @@ class QwenModel():
             history = []
         if chat_format == "chatml":
             im_start, im_end = "<|im_start|>", "<|im_end|>"
-            
+
             def _to_str(role, content):
                 return f"{role}\n{content}"
             system_text = _to_str("system", system)
@@ -84,6 +86,12 @@ class QwenModel():
         input_tokens = tokens['input_ids']
         return input_tokens
 
+    def process_response(self, output, history):
+        output = output.split("<eoa>")[0]
+        return output, [history, output]
+
+    def build_memory(self, memory, query):
+        return memory[0] + [(query, memory[1])]
 
     def generate_sequence(self,
                           input_ids,
@@ -92,7 +100,7 @@ class QwenModel():
                           top_p=0.8,
                           temperature=1):
         attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]),
-                            dtype=np.int64)
+                                 dtype=np.int64)
         past_key_values = None
         num_iteration = 0
         output_tokens = []
@@ -111,7 +119,6 @@ class QwenModel():
                         shape[1] = 0
                     inputs[input_name] = Tensor(
                         model_inputs.get_element_type(), shape.get_shape())
-            
             if attention_mask is not None:
                 inputs["attention_mask"] = attention_mask
             self.request.start_async(inputs, share_inputs=True)
@@ -129,21 +136,23 @@ class QwenModel():
                                            top_k=top_k,
                                            top_p=top_p,
                                            temperature=temperature)
-
-            if next_token == self.im_end_id or len(
+            output_tokens += [next_token]
+            if next_token in self.stop_words or len(
                     output_tokens) > max_generated_tokens:
                 break
-            output_tokens += [next_token]
             attention_mask = np.concatenate((attention_mask, [[1]]), axis=-1)
             input_ids = np.array([[next_token]], dtype=np.longlong)
         return output_tokens, num_iteration
 
     def generate_iterate(self,
                          input_ids,
+                         history,
                          max_generated_tokens,
-                         top_k=20,
-                         top_p=0.7,
+                         top_k=10,
+                         top_p=0.8,
                          temperature=1):
+        attention_mask = np.ones((input_ids.shape[0], input_ids.shape[1]),
+                                 dtype=np.int64)
         past_key_values = None
         output_tokens = []
         while True:
@@ -161,6 +170,8 @@ class QwenModel():
                         shape[1] = 0
                     inputs[input_name] = Tensor(
                         model_inputs.get_element_type(), shape.get_shape())
+            if attention_mask is not None:
+                inputs["attention_mask"] = attention_mask
             self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
             logits = self.request.get_tensor("logits").data
@@ -176,11 +187,11 @@ class QwenModel():
                                            top_p=top_p,
                                            temperature=temperature)
             output_tokens += [next_token]
-
-            if next_token == self.im_end_id or len(
+            if next_token in self.stop_words or len(
                     output_tokens) > max_generated_tokens:
                 break
+            attention_mask = np.concatenate((attention_mask, [[1]]), axis=-1)
             input_ids = np.array([[next_token]], dtype=np.longlong)
-
-            yield process_response(self.tokenizer.decode(output_tokens))
-        return process_response(self.tokenizer.decode(output_tokens))
+            start = start+1
+            yield self.process_response(self.tokenizer.decode(output_tokens, skip_special_tokens=True), history)
+        return self.process_response(self.tokenizer.decode(output_tokens, skip_special_tokens=True), history)

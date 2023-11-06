@@ -1,9 +1,5 @@
 import streamlit as st
 from streamlit_chat import message
-from chatglm.modeling import ChatGLMModel
-from qwen.modeling import QwenModel
-from baichuan2.modeling import BaichuanModel
-from internlm.modeling import InternLMModel
 import argparse
 
 
@@ -28,13 +24,20 @@ def create_model():
     
     args = parser.parse_args()
     model_id = args.model_path
-    if 'chatglm' in model_id:
-        ov_model = ChatGLMModel(model_id, args.device)
+    if 'chatglm2' in model_id:
+        from chatglm.modeling import ChatGLM2Model
+        ov_model = ChatGLM2Model(model_id, args.device)
+    elif 'chatglm3' in model_id:
+        from chatglm.modeling import ChatGLM3Model
+        ov_model = ChatGLM3Model(model_id, args.device)
     elif 'qwen' in model_id:
+        from qwen.modeling import QwenModel
         ov_model = QwenModel(model_id, args.device)
     elif 'baichuan2' in model_id:
-        ov_model = BaichuanModel(model_id, args.device)
+        from baichuan.modeling import Baichuan2Model
+        ov_model = Baichuan2Model(model_id, args.device)
     elif 'internlm' in model_id:
+        from internlm.modeling import InternLMModel
         ov_model = InternLMModel(model_id, args.device)
     else:
         raise NotImplementedError(f"Unsupported model id {model_id!r}")
@@ -46,6 +49,7 @@ with st.spinner("加载模型中..."):
 
 if 'history' not in st.session_state:
     st.session_state.history = []
+    st.session_state.new_memory = []
 
 with st.sidebar:
     system = st.text_area("系统提示词", value="你是一个友好、诚实、善良的聊天助手，可以回答任何问题")
@@ -68,7 +72,7 @@ with st.sidebar:
 st.markdown("## OpenVINO中文聊天助手")
 
 history: list[tuple[str, str]] = st.session_state.history
-
+new_memory = st.session_state.new_memory
 if len(history) == 0:
     st.caption("请在下方输入消息开始会话")
 
@@ -86,9 +90,10 @@ if st.button("发送") and len(question.strip()):
         message(question, is_user=True, key="message_question")
         with st.spinner("正在回复中"):
             with st.empty():
-                prompt_token = chat_model.build_inputs(history, question, system)
-                for answer in chat_model.generate_iterate(
+                prompt_token = chat_model.build_inputs(new_memory, question, system)
+                for answer, memory in chat_model.generate_iterate(
                         prompt_token,
+                        new_memory,
                         max_generated_tokens=max_tokens,
                         top_k=top_k,
                         top_p=top_p,
@@ -96,5 +101,5 @@ if st.button("发送") and len(question.strip()):
                 ):
                     st.write(answer)
         st.markdown("---")
-
+    st.session_state.new_memory = chat_model.build_memory(memory, question)
     st.session_state.history = history + [(question, answer)]

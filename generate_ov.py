@@ -1,7 +1,3 @@
-from chatglm.modeling import ChatGLMModel
-from qwen.modeling import QwenModel
-from baichuan2.modeling import BaichuanModel
-from internlm.modeling import InternLMModel
 import argparse
 import time
 from utils import process_response
@@ -38,13 +34,20 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     model_id = args.model_path
-    if 'chatglm' in model_id:
-        ov_model = ChatGLMModel(model_id, args.device)
+    if 'chatglm2' in model_id:
+        from chatglm.modeling import ChatGLM2Model
+        ov_model = ChatGLM2Model(model_id, args.device)
+    elif 'chatglm3' in model_id:
+        from chatglm.modeling import ChatGLM3Model
+        ov_model = ChatGLM3Model(model_id, args.device)
     elif 'qwen' in model_id:
+        from qwen.modeling import QwenModel
         ov_model = QwenModel(model_id, args.device)
     elif 'baichuan2' in model_id:
-        ov_model = BaichuanModel(model_id, args.device)
+        from baichuan.modeling import Baichuan2Model
+        ov_model = Baichuan2Model(model_id, args.device)
     elif 'internlm' in model_id:
+        from internlm.modeling import InternLMModel
         ov_model = InternLMModel(model_id, args.device)
     else:
         raise NotImplementedError(f"Unsupported model id {model_id!r}")
@@ -55,8 +58,7 @@ if __name__ == "__main__":
     response, num_tokens = ov_model.generate_sequence(
         input_data, max_generated_tokens=args.max_sequence_length)
     end = time.perf_counter()
-    answer = process_response(
-        ov_model.tokenizer.decode(response, skip_special_tokens=True))
-    answer = answer.split("<eoa>")[0]
+    output_data = ov_model.tokenizer.decode(response, skip_special_tokens=True)
+    answer, _ = ov_model.process_response(output_data, [])
     print(answer)
     print(f"Generated {num_tokens} tokens in {end - start:.3f} s")

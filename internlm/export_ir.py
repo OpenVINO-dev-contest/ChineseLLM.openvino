@@ -10,10 +10,10 @@ utils_file_path = Path('.')
 sys.path.append(str(utils_file_path))
 from utils import flattenize_inputs
 
-ir_model_path = Path('internlm') / Path('ir_model')
+ir_model_path = Path('internlm') / Path('internlm')
 if ir_model_path.exists() == False:
     os.mkdir(ir_model_path)
-ir_model = ir_model_path / "internlm.xml"
+ir_model = ir_model_path / "openvino_model.xml"
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument('-h',
