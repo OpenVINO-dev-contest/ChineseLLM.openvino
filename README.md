@@ -57,7 +57,7 @@ pip install -r requirements.txt
     <td class="tg-9wq8">python3 internlm/export_ir.py</td>
   </tr>
   <tr>
-    <td class="tg-9wq8"><span style="font-weight:bold">Export INT8 IR(Optional)</span></td>
+    <td class="tg-9wq8"><span style="font-weight:bold">int4/int8 quantization(Optional)</span></td>
     <td class="tg-9wq8" colspan="4">python3 quantize.py -m "orignal model dir" -o "output model dir" </td>
   </tr>
   <tr>
