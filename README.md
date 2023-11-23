@@ -57,10 +57,6 @@ pip install -r requirements.txt
     <th class="tg-9wq8"><span style="font-weight:bold">Baichuan2</span></th>
     <th class="tg-9wq8"><span style="font-weight:bold">Qwen</span></th>
     <th class="tg-9wq8"><span style="font-weight:bold">Internlm</span></th>
-    <th class="tg-0lax"></th>
-    <th class="tg-0lax"></th>
-    <th class="tg-0lax"></th>
-    <th class="tg-0lax"></th>
   </tr>
 </thead>
 <tbody>
@@ -70,18 +66,10 @@ pip install -r requirements.txt
     <td class="tg-9wq8">python3 baichuan/export_ir.py</td>
     <td class="tg-9wq8">python3 qwen/export_ir.py</td>
     <td class="tg-9wq8">python3 internlm/export_ir.py</td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
   </tr>
   <tr>
     <td class="tg-9wq8"><span style="font-weight:bold">Export INT8 IR(Optional)</span></td>
     <td class="tg-9wq8" colspan="4">python3 quantize.py -m "orignal model dir" -o "output model dir" </td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
   </tr>
   <tr>
     <td class="tg-9wq8"><span style="font-weight:bold">Run text generation</span></td>
@@ -89,10 +77,6 @@ pip install -r requirements.txt
     <td class="tg-9wq8">python3 generate_ov.py -m 'baichuan/baichuan2' -p '请介绍一下上海</td>
     <td class="tg-9wq8">python3 generate_ov.py -m 'qwen/qwen' -p '请介绍一下上海'</td>
     <td class="tg-9wq8">python3 generate_ov.py -m 'internlm/internlm' -p '请介绍一下上海'</td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
   </tr>
   <tr>
     <td class="tg-9wq8"><span style="font-weight:bold">Run chatbot</span></td>
@@ -100,10 +84,6 @@ pip install -r requirements.txt
     <td class="tg-9wq8">streamlit run chatbot.py -- -m 'baichuan/baichuan2'</td>
     <td class="tg-9wq8">streamlit run chatbot.py -- -m 'qwen/qwen'</td>
     <td class="tg-9wq8">streamlit run chatbot.py -- -m 'internlm/internlm'</td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
-    <td class="tg-0lax"></td>
   </tr>
 </tbody>
 </table>
