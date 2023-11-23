@@ -16,6 +16,9 @@ if ir_model_path.exists() == False:
     os.mkdir(ir_model_path)
 ir_model = ir_model_path / "openvino_model.xml"
 
+def _update_qwen_rotary_embedding_cache(model):
+    model.transformer.rotary_emb(2048)
+
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument('-h',
                     '--help',
@@ -27,30 +30,21 @@ parser.add_argument('-m',
                     required=False,
                     type=str,
                     help='orignal model path')
-parser.add_argument('-cw',
-                    '--compress_weight',
-                    default=False,
-                    required=False,
-                    type=bool,
-                    help='Weights Compression')
 args = parser.parse_args()
 
 model = AutoModelForCausalLM.from_pretrained(args.model_id,
                                              device_map="auto",
                                              trust_remote_code=True).eval()
-
-if args.compress_weight == True:
-    print("--- compress weight ---")
-    from nncf import compress_weights
-    model = compress_weights(model)
+_update_qwen_rotary_embedding_cache(model)
 
 # Specify hyperparameters for generation
 model.generation_config = GenerationConfig.from_pretrained(
     args.model_id, trust_remote_code=True)
+model.config.save_pretrained(ir_model_path)
 model.config.use_cache = True
 
-outs = model(input_ids=torch.ones((1, 2048), dtype=torch.long),
-             attention_mask=torch.ones((1, 2048), dtype=torch.long))
+outs = model(input_ids=torch.ones((1, 10), dtype=torch.long),
+             attention_mask=torch.ones((1, 10), dtype=torch.long))
 inputs = ["input_ids"]
 outputs = ["logits"]
 
@@ -72,7 +66,7 @@ inputs.append("attention_mask")
 dummy_inputs = {
     "input_ids": torch.ones((1, 2), dtype=torch.long),
     "past_key_values": outs.past_key_values,
-    "attention_mask": torch.ones((1, 2050), dtype=torch.long)
+    "attention_mask": torch.ones((1, 12), dtype=torch.long)
 }
 model.config.torchscript = True
 

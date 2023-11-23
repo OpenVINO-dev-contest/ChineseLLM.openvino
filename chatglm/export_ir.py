@@ -1,8 +1,9 @@
+from transformers import AutoTokenizer, AutoModelForCausalLM
 import os
 import sys
 import openvino as ov
-from transformers import AutoModel
 import torch
+import types
 from pathlib import Path
 import argparse
 
@@ -21,13 +22,42 @@ parser.add_argument('-m',
                     required=False,
                     type=str,
                     help='orignal model path')
-parser.add_argument('-cw',
-                    '--compress_weight',
-                    default=False,
-                    required=False,
-                    type=bool,
-                    help='Weights Compression')
 args = parser.parse_args()
+
+
+@torch.jit.script_if_tracing
+def _chatglm2_get_context_layer(query_layer: torch.Tensor, key_layer: torch.Tensor, value_layer: torch.Tensor):
+    mask = torch.zeros((query_layer.shape[-2], key_layer.shape[-2]), dtype=query_layer.dtype)
+    if query_layer.shape[2] == key_layer.shape[2]:
+        tmp_mask = torch.ones((query_layer.shape[-2], key_layer.shape[-2]), dtype=torch.bool).triu(diagonal=1)
+        mask.masked_fill_(tmp_mask, float("-inf"))
+
+    context_layer = torch.nn.functional.scaled_dot_product_attention(query_layer, key_layer, value_layer, attn_mask=mask)
+    return context_layer
+
+
+def _core_attention_forward(self, query_layer, key_layer, value_layer, attention_mask):
+    query_layer, key_layer, value_layer = [k.permute(1, 2, 0, 3) for k in [query_layer, key_layer, value_layer]]
+    if attention_mask is None:
+        context_layer = _chatglm2_get_context_layer(query_layer, key_layer, value_layer)
+    else:
+        attention_mask = ~attention_mask
+        context_layer = torch.nn.functional.scaled_dot_product_attention(
+            query_layer, key_layer, value_layer, attention_mask
+        )
+    context_layer = context_layer.permute(2, 0, 1, 3)
+    new_context_layer_shape = context_layer.size()[:-2] + (self.hidden_size_per_partition,)
+    context_layer = context_layer.reshape(*new_context_layer_shape)
+
+    return context_layer
+
+
+def _patch_chatglm_core_attention_forward(model: "PreTrainedModel"):
+    for block in model.transformer.encoder.layers:
+        block.self_attention.core_attention.forward = types.MethodType(
+            _core_attention_forward, block.self_attention.core_attention
+        )
+
 
 if 'chatglm2' in args.model_id:
     ir_model_path = Path('chatglm') / Path('chatglm2')
@@ -41,23 +71,20 @@ else:
     raise NotImplementedError(f"Unsupported model id {args.model_id!r}")
 
 ir_model = ir_model_path / "openvino_model.xml"
-model = AutoModel.from_pretrained(args.model_id,
-                                  trust_remote_code=True).float()
+model = AutoModelForCausalLM.from_pretrained(args.model_id,                    
+                                            torch_dtype=torch.float32,
+                                            trust_remote_code=True,)
+# _patch_chatglm_core_attention_forward(model)
+model.config.save_pretrained(ir_model_path)
 model.config.use_cache = True
-device = 'cpu'
 
 outs = model(input_ids=torch.ones((1, 10), dtype=torch.long),
              position_ids=torch.arange(0, 10, dtype=torch.long))
 inputs = ["input_ids"]
 outputs = ["logits"]
 
-if args.compress_weight == True:
-    print("--- compress weight ---")
-    from nncf import compress_weights
-    model = compress_weights(model)
-
-dynamic_shapes = {"input_ids": {1: "seq_len"}, "position_ids": {1: "seq_len"}}
-inputs.append("position_ids")
+dynamic_shapes = {"input_ids": {1: "seq_len"}, "position_ids": {1: "seq_len"}, "attention_mask": {1: "seq_len"}}
+inputs += ["position_ids", "attention_mask"]
 for idx in range(len(outs.past_key_values)):
     inputs.extend(
         [f"past_key_values.{idx}.key", f"past_key_values.{idx}.value"])
@@ -68,8 +95,10 @@ for idx in range(len(outs.past_key_values)):
 dummy_inputs = {
     "input_ids": torch.ones((1, 1), dtype=torch.long),
     "position_ids": torch.tensor([[10]], dtype=torch.long),
+    "attention_mask": torch.ones((1, 11), dtype=torch.long),
     "past_key_values": outs.past_key_values
 }
+
 model.config.torchscript = True
 
 print("====Exporting IR=====")
@@ -93,6 +122,6 @@ ov_model.validate_nodes_and_infer_types()
 ov.save_model(ov_model, ir_model)
 
 print("====Exporting tokenizer=====")
-from transformers import AutoTokenizer
-tokenizer = AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained(
+    args.model_id, trust_remote_code=True)
 tokenizer.save_pretrained(ir_model_path)

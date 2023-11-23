@@ -27,26 +27,16 @@ parser.add_argument('-m',
                     required=False,
                     type=str,
                     help='orignal model path')
-parser.add_argument('-cw',
-                    '--compress_weight',
-                    default=False,
-                    required=False,
-                    type=bool,
-                    help='Weights Compression')
 args = parser.parse_args()
 
 model = AutoModelForCausalLM.from_pretrained(args.model_id,
                                              device_map="auto",
                                              trust_remote_code=True).eval()
 
-if args.compress_weight == True:
-    print("--- compress weight ---")
-    from nncf import compress_weights
-    model = compress_weights(model)
-
 # Specify hyperparameters for generation
 model.generation_config = GenerationConfig.from_pretrained(
     args.model_id, trust_remote_code=True)
+model.config.save_pretrained(ir_model_path)
 model.config.use_cache = True
 
 outs = model(input_ids=torch.ones((1, 10), dtype=torch.long),

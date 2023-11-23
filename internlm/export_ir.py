@@ -26,23 +26,13 @@ parser.add_argument('-m',
                     required=False,
                     type=str,
                     help='orignal model path')
-parser.add_argument('-cw',
-                    '--compress_weight',
-                    default=False,
-                    required=False,
-                    type=bool,
-                    help='Weights Compression')
 args = parser.parse_args()
 
 model = AutoModelForCausalLM.from_pretrained(args.model_id,
                                              trust_remote_code=True).eval()
 
-if args.compress_weight == True:
-    print("--- compress weight ---")
-    from nncf import compress_weights
-    model = compress_weights(model)
-
 model.config.use_cache = True
+model.config.save_pretrained(ir_model_path)
 outs = model(input_ids=torch.ones((1, 10), dtype=torch.long),
              attention_mask=torch.ones((1, 10), dtype=torch.long))
 inputs = ["input_ids"]
@@ -69,6 +59,7 @@ dummy_inputs = {
     "attention_mask": torch.ones((1, 12), dtype=torch.long),
     "past_key_values": outs.past_key_values
 }
+model.config.save_pretrained(ir_model_path)
 model.config.torchscript = True
 
 print("====Exporting IR=====")
