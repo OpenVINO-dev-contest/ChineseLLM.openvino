@@ -50,7 +50,7 @@ pip install -r requirements.txt
 </thead>
 <tbody>
   <tr>
-    <td class="tg-uzvj">Export FP16 IR</td>
+    <td class="tg-uzvj"><span style="font-weight:bold">Export FP16 IR</td>
     <td class="tg-9wq8">python3 chatglm/export_ir.py</td>
     <td class="tg-9wq8">python3 baichuan/export_ir.py</td>
     <td class="tg-9wq8">python3 qwen/export_ir.py</td>
