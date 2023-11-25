@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+import time
 from transformers import AutoTokenizer
 from openvino.runtime import Core, Tensor
 from pathlib import Path
@@ -85,6 +86,7 @@ class Baichuan2Model():
                                  dtype=np.int64)
         past_key_values = None
         num_iteration = 0
+        other_latency = 0
         output_tokens = []
         while True:
             inputs = {"input_ids": input_ids}
@@ -103,8 +105,14 @@ class Baichuan2Model():
                         model_inputs.get_element_type(), shape.get_shape())
             if attention_mask is not None:
                 inputs["attention_mask"] = attention_mask
+            before = time.perf_counter()
             self.request.start_async(inputs, share_inputs=True)
             self.request.wait()
+            after = time.perf_counter()
+            if num_iteration == 0:
+                first_latency = after - before
+            else:
+                other_latency += after - before
             num_iteration += 1
             logits = self.request.get_tensor("logits").data
             past_key_values = tuple(
@@ -125,7 +133,7 @@ class Baichuan2Model():
                 break
             attention_mask = np.concatenate((attention_mask, [[1]]), axis=-1)
             input_ids = np.array([[next_token]], dtype=np.longlong)
-        return output_tokens, num_iteration
+        return output_tokens, num_iteration, (first_latency, other_latency)
 
     def generate_iterate(self,
                          input_ids,
