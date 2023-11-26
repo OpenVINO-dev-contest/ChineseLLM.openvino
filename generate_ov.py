@@ -82,5 +82,5 @@ if __name__ == "__main__":
     print(
         f"Maximum rss memory counsuption: {max_rss_mem_consumption:.2f} MB, Maximum shared memory counsuption: {max_shared_mem_consumption:.2f}  MB")
     print(
-        f"Fisrt inference latency: {1000*latencies[0]:.2f} ms/token, Other inference latency {1000*latencies[1]/(num_tokens-1):.2f} ms/token in average")
+        f"First inference latency: {1000*latencies[0]:.2f} ms/token, Other inference latency {1000*latencies[1]/(num_tokens-1):.2f} ms/token in average")
     mem_consumption.end_collect_mem_consumption_thread()
