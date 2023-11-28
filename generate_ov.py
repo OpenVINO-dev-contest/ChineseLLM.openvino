@@ -80,7 +80,7 @@ if __name__ == "__main__":
     print(
         f"Generated {num_tokens} tokens in {end - start:.2f} s on {args.device}")
     print(
-        f"Maximum rss memory counsuption: {max_rss_mem_consumption:.2f} MB, Maximum shared memory counsuption: {max_shared_mem_consumption:.2f}  MB")
+        f"Maximum rss memory consumption: {max_rss_mem_consumption:.2f} MB, Maximum shared memory consumption: {max_shared_mem_consumption:.2f}  MB")
     print(
         f"First inference latency: {1000*latencies[0]:.2f} ms/token, Other inference latency {1000*latencies[1]/(num_tokens-1):.2f} ms/token in average")
     mem_consumption.end_collect_mem_consumption_thread()
