@@ -38,6 +38,8 @@ pip install -r requirements.txt
 
 **2. Run tasks:**
 
+Please note you should run ```pip install transformers==4.30.2```
+
 <table class="tg">
 <thead>
   <tr>

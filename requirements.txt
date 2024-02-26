@@ -2,8 +2,8 @@
 numpy
 streamlit
 streamlit-chat
-openvino-dev==2023.3.0
-transformers==4.32.0
+openvino==2023.3.0
+transformers>=4.38.1
 git+https://github.com/openvinotoolkit/nncf.git
 sentencepiece
 onnx>=1.11.0

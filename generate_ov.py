@@ -37,7 +37,6 @@ if __name__ == "__main__":
     if 'chatglm2' in model_id:
         from chatglm.modeling import ChatGLM2Model
         ov_model = ChatGLM2Model(model_id, args.device)
-        print("yes")
     elif 'chatglm3' in model_id:
         from chatglm.modeling import ChatGLM3Model
         ov_model = ChatGLM3Model(model_id, args.device)
