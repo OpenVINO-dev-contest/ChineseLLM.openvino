@@ -38,7 +38,7 @@ pip install -r requirements.txt
 
 **2. Run tasks:**
 
-Please note you should run ```pip install transformers==4.30.2```
+Please note you should run ```pip install transformers==4.30.2``` before starting the conversion and inference of #ChatGLM2
 
 <table class="tg">
 <thead>
